@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.mapreduce.Reducer.Context;
 import org.apache.pig.PigException;
 import org.apache.pig.backend.executionengine.ExecException;
@@ -67,7 +68,7 @@ public class TriReduce extends StormBaseFunction {
 		if (vl instanceof NullableTuple) {
 			// Combine input
 			tuples.add((NullableTuple)(vl));
-		} else if (vl instanceof Map) {
+		} else if (vl instanceof MapWritable) {
 			// BasicPersist input
 			tuples = TriBasicPersist.getTuples(vl);
 		}

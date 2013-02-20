@@ -95,7 +95,7 @@ public class TestStream extends TestCase {
 
     	pig.registerQuery("x = FOREACH x GENERATE FLATTEN(TOKENIZE(sentence));");
     	pig.registerQuery("x = FOREACH x GENERATE LOWER($0) AS word;");
-//    	props.setProperty("count_gr_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"expiration\": 300, \"serializer\":\"org.apache.pig.impl.storm.state.PigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
+    	props.setProperty("count_gr_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"expiration\": 300, \"serializer\":\"org.apache.pig.impl.storm.state.PigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
     	
     	pig.registerQuery("count_gr = GROUP x BY word;");
     	pig.registerQuery("count = FOREACH count_gr GENERATE group AS word, COUNT(x) AS wc;");
@@ -106,9 +106,9 @@ public class TestStream extends TestCase {
     	pig.registerQuery("c = FOREACH q GENERATE COUNT(x);");
 //    	pig.registerQuery("STORE c INTO '/dev/null/1';");
     	
-    	pig.registerQuery("STORE hist INTO '/dev/null/1';");
+//    	pig.registerQuery("STORE hist INTO '/dev/null/1';");
 //    	pig.registerQuery("STORE x INTO '/dev/null/1';");
-//    	pig.registerQuery("STORE count_gr INTO '/dev/null/1';");
+    	pig.registerQuery("STORE count_gr INTO '/dev/null/1';");
 //    	pig.registerQuery("STORE count INTO '/dev/null/1';");
     	
 //    	ByteArrayOutputStream baos = new ByteArrayOutputStream();

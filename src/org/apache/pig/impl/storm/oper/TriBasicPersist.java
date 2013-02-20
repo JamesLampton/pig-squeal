@@ -8,6 +8,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.MapWritable;
+import org.apache.hadoop.io.Writable;
+import org.apache.pig.data.InternalMap;
 import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.util.ObjectSerializer;
 
@@ -17,24 +21,28 @@ import storm.trident.tuple.TridentTuple;
 public class TriBasicPersist implements ReducerAggregator {
 		
 	@Override
-	public Map<Object, Integer> init() {
-		return new HashMap<Object, Integer>();
+	public MapWritable init() {
+		return new MapWritable();
 	}
 
 	@Override
-	public Map<Object, Integer> reduce(Object curr, TridentTuple tuple) {
-		Map<Object, Integer> state = (Map<Object, Integer>) curr;
+	public MapWritable reduce(Object curr, TridentTuple tuple) {
+		MapWritable state = (MapWritable) curr;
 		if (state == null) {
 			state = init();
 		}
 		
-		Object values = tuple.get(1);
+		NullableTuple values = (NullableTuple) tuple.get(1);
 		
 		// Serialize the tuple to a string to be used as the key into the state.
-		try {			
-//			String k = ObjectSerializer.serialize((Serializable) values);
-			Integer p = state.get(values);
-			state.put(values, (p == null) ? 1 : p + 1);
+		try {
+			IntWritable iw = (IntWritable) state.get(values);
+			if (iw == null) {
+				iw = new IntWritable(1);
+				state.put(values, iw);
+			} else {
+				iw.set(iw.get() + 1);
+			}
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -46,9 +54,9 @@ public class TriBasicPersist implements ReducerAggregator {
 	static public List<NullableTuple> getTuples(Object state_o) {
 		List<NullableTuple> ret = new ArrayList<NullableTuple>();
 		
-		Map<Object, Integer> state = (Map<Object, Integer>) state_o;
-		for (Entry<Object, Integer> ent : state.entrySet()) {
-			int c = ent.getValue();
+		MapWritable state = (MapWritable) state_o;
+		for (Entry<Writable, Writable> ent : state.entrySet()) {
+			int c = ((IntWritable) ent.getValue()).get();
 			NullableTuple v = (NullableTuple) ent.getKey();
 			for (int i = 0; i < c; i++) {
 				ret.add(v);
