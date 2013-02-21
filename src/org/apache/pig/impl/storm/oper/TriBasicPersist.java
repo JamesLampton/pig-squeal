@@ -1,55 +1,19 @@
 package org.apache.pig.impl.storm.oper;
 
-import java.io.IOException;
-import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.Writable;
-import org.apache.pig.data.InternalMap;
 import org.apache.pig.impl.io.NullableTuple;
-import org.apache.pig.impl.util.ObjectSerializer;
 
+import storm.trident.operation.CombinerAggregator;
 import storm.trident.operation.ReducerAggregator;
 import storm.trident.tuple.TridentTuple;
 
-public class TriBasicPersist implements ReducerAggregator {
-		
-	@Override
-	public MapWritable init() {
-		return new MapWritable();
-	}
-
-	@Override
-	public MapWritable reduce(Object curr, TridentTuple tuple) {
-		MapWritable state = (MapWritable) curr;
-		if (state == null) {
-			state = init();
-		}
-		
-		NullableTuple values = (NullableTuple) tuple.get(1);
-		
-		// Serialize the tuple to a string to be used as the key into the state.
-		try {
-			IntWritable iw = (IntWritable) state.get(values);
-			if (iw == null) {
-				iw = new IntWritable(1);
-				state.put(values, iw);
-			} else {
-				iw.set(iw.get() + 1);
-			}
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-				
-		return state;
-	}
+public class TriBasicPersist implements CombinerAggregator<MapWritable> {
 
 	static public List<NullableTuple> getTuples(Object state_o) {
 		List<NullableTuple> ret = new ArrayList<NullableTuple>();
@@ -64,5 +28,48 @@ public class TriBasicPersist implements ReducerAggregator {
 		}
 		
 		return ret;
+	}
+
+	@Override
+	public MapWritable init(TridentTuple tuple) {
+		MapWritable ret = new MapWritable();
+		NullableTuple values = (NullableTuple) tuple.get(1);
+		ret.put(values, new IntWritable(1));
+		return ret;
+	}
+
+	@Override
+	public MapWritable combine(MapWritable val1, MapWritable val2) {
+		
+		// Going under the assumption that val1 came from the cache/store.
+		
+		// val2 are the new values.
+
+		
+		// We're going to merge into val1.
+		if (val1 == null) {
+			val1 = new MapWritable();
+		}
+		
+		if (val2 != null) {
+			for (Entry<Writable, Writable> ent : val2.entrySet()) {
+				NullableTuple values = (NullableTuple) ent.getKey();
+				int c = ((IntWritable) ent.getValue()).get();
+				IntWritable iw = (IntWritable) val1.get(values);
+				if (iw == null) {
+					iw = new IntWritable(c);
+					val1.put(values, iw);
+				} else {
+					iw.set(iw.get() + c);
+				}
+			}
+		}
+		
+		return val1;
+	}
+
+	@Override
+	public MapWritable zero() {
+		return null;
 	}
 }
