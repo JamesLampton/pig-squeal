@@ -2,10 +2,14 @@ package org.apache.pig.impl.storm.oper;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.MapWritable;
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.Reducer.Context;
 import org.apache.pig.PigException;
 import org.apache.pig.backend.executionengine.ExecException;
@@ -57,6 +61,87 @@ public class TriReduce extends StormBaseFunction {
 		}
 	}
 	
+	class FakeCollector implements TridentCollector {
+
+		private TridentCollector collector;
+		
+		private Map<Writable, IntWritable> last_res = new HashMap<Writable, IntWritable>();
+		private Map<Writable, IntWritable> cur_res = new HashMap<Writable, IntWritable>();
+
+		int state = 0;
+		
+		public FakeCollector(TridentCollector collector) {
+			this.collector = collector;
+		}
+		
+		public void switchToCur() {
+			state = 1;
+		}
+		
+		void inc(Map<Writable, IntWritable> m, Tuple v) {
+			IntWritable iw = m.get(v);
+			if (iw == null) {
+				iw = new IntWritable(0);
+				m.put(v, iw);
+			}
+			iw.set(iw.get() + 1);
+		}
+		
+		@Override
+		public void emit(List<Object> values) {
+//			System.out.println("Emit: " + values.get(1) + " -> " + values.get(1).getClass());
+			// Pull the value
+			Tuple v = (Tuple) values.get(1);
+			
+			if (state == 0) {
+				inc(last_res, v);
+			} else {
+				// See if v was in the last_set.
+				IntWritable iw = last_res.get(v);
+				if (iw == null) {
+					// We have a new message.
+					inc(cur_res, v);
+				} else {
+					// Decrement last_res.
+					int cur = iw.get() - 1;
+					// Remove v from last_res if we can account for all the previous messages.
+					if (cur == 0) {
+						last_res.remove(v);
+					} else {
+						iw.set(cur);
+					}
+				}
+			}
+		}
+
+		@Override
+		public void reportError(Throwable t) {
+			collector.reportError(t);
+		}
+		
+		// Emit positive and negative messages.
+		public void emitValues() {
+			// Any values in cur_set go out as "positive" messages.
+			for (Entry<Writable, IntWritable>  ent: cur_res.entrySet()) {
+				int count = ent.getValue().get();
+				System.err.println("Pos: " + ent);
+				for (int i = 0; i < count ; i++) {
+					collector.emit(new Values(null, ent.getKey()));
+				}
+			}
+			
+			// Any values in last_set go out as "negative" messages.
+			for (Entry<Writable, IntWritable>  ent: last_res.entrySet()) {
+				int count = ent.getValue().get();
+				System.err.println("Neg: " + ent);
+				for (int i = 0; i < count ; i++) {
+					// TODO
+//					collector.emit(new Values(null, ent.getKey()));
+				}
+			}
+		}
+	}
+	
 	@Override
 	public void execute(TridentTuple tri_tuple, TridentCollector collector) {
 //		System.out.println("TriReduce input: " + tri_tuple);
@@ -64,19 +149,40 @@ public class TriReduce extends StormBaseFunction {
 		PigNullableWritable key = (PigNullableWritable) tri_tuple.get(0);
 		
 		Object vl = tri_tuple.get(1);
-		List<NullableTuple> tuples = new ArrayList<NullableTuple>();
+		List<NullableTuple> tuples;
 		if (vl instanceof NullableTuple) {
 			// Combine input
+			tuples = new ArrayList<NullableTuple>();
 			tuples.add((NullableTuple)(vl));
+			
+			runReduce(key, tuples, collector);
 		} else if (vl instanceof MapWritable) {
 			// BasicPersist input
-			tuples = TriBasicPersist.getTuples(vl);
+			MapWritable m = (MapWritable) vl;
+						
+			FakeCollector fc = new FakeCollector(collector);
+			
+			// Calculate the previous values.
+			tuples = CombineWrapper.getTuples(m, CombineWrapper.LAST);
+			if (tuples != null) {
+				runReduce(key, tuples, fc);
+			}
+			
+			// Calculate the current values.
+			tuples = CombineWrapper.getTuples(m, CombineWrapper.CUR);
+			fc.switchToCur();
+			runReduce(key, tuples, fc);
+			
+			// Emit positive and negative values.
+			fc.emitValues();
 		}
-		
+	}
+
+	public void runReduce(PigNullableWritable key, List<NullableTuple> tuples, TridentCollector collector) {
 		try {
+			pack.attachInput(key, tuples.iterator());
 			if (pack instanceof POJoinPackage)
 			{
-				pack.attachInput(key, tuples.iterator());
 				while (true)
 				{
 					if (processOnePackageOutput(collector))
@@ -86,14 +192,12 @@ public class TriReduce extends StormBaseFunction {
 			else {
 				// join is not optimized, so package will
 				// give only one tuple out for the key
-				pack.attachInput(key, tuples.iterator());
 				processOnePackageOutput(collector);
 			} 
 		} catch (ExecException e) {
 			throw new RuntimeException(e);
 		}
 	}
-
 	
 	public boolean processOnePackageOutput(TridentCollector collector) throws ExecException  {
         Result res = pack.getNext(DUMMYTUPLE);

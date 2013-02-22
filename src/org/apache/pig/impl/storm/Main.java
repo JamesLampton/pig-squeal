@@ -13,6 +13,7 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOpe
 import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.plan.DependencyOrderWalker;
 import org.apache.pig.impl.plan.VisitorException;
+import org.apache.pig.impl.storm.oper.CombineWrapper;
 import org.apache.pig.impl.storm.oper.TriBasicPersist;
 import org.apache.pig.impl.storm.oper.TriCombinePersist;
 import org.apache.pig.impl.storm.oper.TriMakePigTuples;
@@ -119,7 +120,7 @@ public class Main {
 							.persistentAggregate(
 								sop.getStateFactory(pc),
 								input.getOutputFields(),
-								new TriBasicPersist(), 
+								new CombineWrapper(new TriBasicPersist()), 
 								output_fields
 							).newValuesStream();
 				} else {					
