@@ -79,10 +79,9 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 
 	@Override
 	public String name() {
-		// TODO Auto-generated method stub
-		return null;
+		return alias;
 	}
-
+	
 	public StateFactory getStateFactory(PigContext pc) {
 		// Pull the leaf's name and look for storage options.
 		String store_opts = pc.getProperties().getProperty(alias + "_store_opts");
@@ -90,13 +89,20 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 		return new StateWrapper(store_opts).getStateFactory();
 //		return new LRUMemoryMapState.Factory(10000);
 	}
+	
+	public String getStateFactoryOpts(PigContext pc) {
+		if (pc == null) {
+			return "unknown";
+		}
+		return pc.getProperties().getProperty(alias + "_store_opts");
+	}
 
 	public Fields getOutputFields() {
 		String field_pre = getOperatorKey().toString();
 		if (t == OpType.BASIC_PERSIST || t == OpType.COMBINE_PERSIST) {
 			return new Fields(field_pre + "_vl");
 		}
-		return new Fields(field_pre + "_k", field_pre + "_v");
+		return new Fields(field_pre + "_k", field_pre + "_v", field_pre + "_tive");
 	}
 
 }

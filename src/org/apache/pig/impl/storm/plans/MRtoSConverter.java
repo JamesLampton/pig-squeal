@@ -10,6 +10,7 @@ import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.PhyPlanSette
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.MROpPlanVisitor;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.MROperPlan;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.PhysicalOperator;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhysicalPlan;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLocalRearrange;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
@@ -61,6 +62,20 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		}
 	}
 	
+	String getAlias(PhysicalPlan p, boolean useRoots) {
+//		System.out.println(useRoots + " Reduce Roots: " + p.getRoots() + " Leaves: " + p.getLeaves());
+		if (useRoots) {
+			PhysicalOperator root = p.getRoots().get(0);
+			return root.getAlias();
+		}
+		
+		PhysicalOperator leaf = p.getLeaves().get(0);
+		if (leaf instanceof POStore) {
+			leaf = p.getPredecessors(leaf).get(0);
+		}
+		return (leaf == null) ? null : leaf.getAlias();
+	}
+	
 	public void visitMROp(MapReduceOper mr) throws VisitorException {
 		splan.UDFs.addAll(mr.UDFs);
 		
@@ -69,7 +84,7 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		
 		// Map SOP -- Attach to Spout or to Reduce SOP -- replace LOADs
 		// Optional Spout Point (May hook onto the end of a Reduce SOP)
-		StormOper mo = getSOp(StormOper.OpType.MAP, mr.mapPlan.getLeaves().get(0).getAlias());
+		StormOper mo = getSOp(StormOper.OpType.MAP, getAlias(mr.mapPlan, false));
 		mo.mapKeyType = mr.mapKeyType;
 		splan.add(mo);
 
@@ -124,13 +139,13 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		// Persist SOP
 		StormOper po;
 		if (mr.combinePlan.size() > 0) {
-			po = getSOp(StormOper.OpType.COMBINE_PERSIST, mr.combinePlan.getLeaves().get(0).getAlias());
+			po = getSOp(StormOper.OpType.COMBINE_PERSIST, getAlias(mr.combinePlan, true));
 			// Combine SOP
 			po.setPlan(mr.combinePlan);
 			po.mapKeyType = mr.mapKeyType;
 		} else {
 			// Basic store SOP
-			po = getSOp(StormOper.OpType.BASIC_PERSIST, mr.reducePlan.getLeaves().get(0).getAlias());		
+			po = getSOp(StormOper.OpType.BASIC_PERSIST, getAlias(mr.reducePlan, true));
 		}
 		splan.add(po);
 		try {
@@ -140,7 +155,7 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		}
 		
 		// Reduce SOP
-		StormOper rdo = getSOp(StormOper.OpType.REDUCE_DELTA, mr.reducePlan.getLeaves().get(0).getAlias());
+		StormOper rdo = getSOp(StormOper.OpType.REDUCE_DELTA, getAlias(mr.reducePlan, false));
 		splan.add(rdo);
 		try {
 			splan.connect(po, rdo);

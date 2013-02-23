@@ -39,6 +39,8 @@ public class TriReduce extends StormBaseFunction {
 	private boolean errorInReduce;
 	private final static Tuple DUMMYTUPLE = null;
 	private final static PhysicalOperator[] DUMMYROOTARR = {};
+	private final static Integer POS = 1;
+	private final static Integer NEG = -1;
 	
 	public TriReduce(PhysicalPlan plan) {
 		// We need to trim things from the plan re:GenericMapReduce.java
@@ -124,19 +126,18 @@ public class TriReduce extends StormBaseFunction {
 			// Any values in cur_set go out as "positive" messages.
 			for (Entry<Writable, IntWritable>  ent: cur_res.entrySet()) {
 				int count = ent.getValue().get();
-				System.err.println("Pos: " + ent);
+//				System.err.println("Pos: " + ent);
 				for (int i = 0; i < count ; i++) {
-					collector.emit(new Values(null, ent.getKey()));
+					collector.emit(new Values(null, ent.getKey(), POS));
 				}
 			}
 			
 			// Any values in last_set go out as "negative" messages.
 			for (Entry<Writable, IntWritable>  ent: last_res.entrySet()) {
 				int count = ent.getValue().get();
-				System.err.println("Neg: " + ent);
+//				System.err.println("Neg: " + ent);
 				for (int i = 0; i < count ; i++) {
-					// TODO
-//					collector.emit(new Values(null, ent.getKey()));
+					collector.emit(new Values(null, ent.getKey(), NEG));
 				}
 			}
 		}

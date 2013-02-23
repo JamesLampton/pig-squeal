@@ -13,13 +13,17 @@ import storm.trident.operation.CombinerAggregator;
 import storm.trident.tuple.TridentTuple;
 
 public class TriBasicPersist implements CombinerAggregator<MapWritable> {
-
+	
 	static public List<NullableTuple> getTuples(MapWritable state) {
 		List<NullableTuple> ret = new ArrayList<NullableTuple>();
 		
 		for (Entry<Writable, Writable> ent : state.entrySet()) {
 			int c = ((IntWritable) ent.getValue()).get();
 			NullableTuple v = (NullableTuple) ent.getKey();
+			// If c is negative then we may have seen the inverse tuple for 
+			// a positive tuple we've yet to see.  This will silently consume
+			// them.
+			// FIXME: Or we have a terrible problem...
 			for (int i = 0; i < c; i++) {
 				ret.add(v);
 			}
@@ -32,7 +36,9 @@ public class TriBasicPersist implements CombinerAggregator<MapWritable> {
 	public MapWritable init(TridentTuple tuple) {
 		MapWritable ret = zero();
 		NullableTuple values = (NullableTuple) tuple.get(1);
-		ret.put(values, new IntWritable(1));
+		
+		// Track the +/- stuff through.
+		ret.put(values, new IntWritable(tuple.getInteger(2)));
 		return ret;
 	}
 

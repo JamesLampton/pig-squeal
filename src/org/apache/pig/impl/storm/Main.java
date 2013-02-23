@@ -136,6 +136,7 @@ public class Main {
 							.persistentAggregate(
 								sop.getStateFactory(pc),
 								gr_output.getOutputFields(),
+								// TODO: Handle the negative stuff appropriately.
 								new TriCombinePersist(pack, sop.getPlan(), sop.mapKeyType), 
 								new Fields(output_fields.get(0) + "_tmp")
 							).newValuesStream();
@@ -159,8 +160,8 @@ public class Main {
 			
 			sop_streams.put(sop, output);
 			
-//			System.out.println("input fields: " + input.getOutputFields());
-//			System.out.println("output fields: " + output.getOutputFields());
+			System.out.println("input fields: " + input.getOutputFields());
+			System.out.println("output fields: " + output.getOutputFields());
 		}
 	};
 	

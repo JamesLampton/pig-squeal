@@ -8,16 +8,19 @@ import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.MROper
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.PhysicalOperator;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhysicalPlan;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PlanPrinter;
+import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.plan.DepthFirstWalker;
 import org.apache.pig.impl.plan.VisitorException;
 
 public class SPrinter extends SOpPlanVisitor {
 	private boolean isVerbose;
 	private PrintStream mStream;
+	private PigContext pc;
 
-	public SPrinter(PrintStream ps, SOperPlan plan) {
+	public SPrinter(PrintStream ps, SOperPlan plan, PigContext pc) {
 		super(plan, new DepthFirstWalker<StormOper, SOperPlan>(plan));
-        mStream = ps;
+        this.pc = pc;
+		mStream = ps;
         mStream.println("#--------------------------------------------------");
         mStream.println("# Storm Plan                                       ");
         mStream.println("#--------------------------------------------------");	
@@ -29,7 +32,10 @@ public class SPrinter extends SOpPlanVisitor {
 
     @Override
     public void visitSOp(StormOper sop) throws VisitorException {
-        mStream.println("Storm node " + sop.getOperatorKey().toString() + " type: " + sop.getType());
+        mStream.println("Storm node " + sop.getOperatorKey().toString() + " type: " + sop.getType() + " alias: " + sop.name());
+        if (sop.getType() == StormOper.OpType.BASIC_PERSIST || sop.getType() == StormOper.OpType.COMBINE_PERSIST) {
+        	mStream.println("Backing Store: " + sop.getStateFactoryOpts(pc));
+        }
         if (sop.plan != null) {
           PlanPrinter<PhysicalOperator, PhysicalPlan> printer = new PlanPrinter<PhysicalOperator, PhysicalPlan>(sop.plan, mStream);
           printer.setVerbose(isVerbose);

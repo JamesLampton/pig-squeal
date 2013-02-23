@@ -17,6 +17,8 @@ import storm.trident.tuple.TridentTuple;
 
 public class TriMakePigTuples extends BaseFunction {
 	
+	Integer POS = new Integer(1);
+	Integer NEG = new Integer(-1);
 	private TupleFactory tf;
 	
 	@Override
@@ -36,7 +38,7 @@ public class TriMakePigTuples extends BaseFunction {
 			}
 		}
 		
-		collector.emit(new Values(null, tf.newTupleNoCopy(ret_arr)));
+		collector.emit(new Values(null, tf.newTupleNoCopy(ret_arr), POS));
 	}
 
 }

@@ -81,6 +81,7 @@ public class TestStream extends TestCase {
     	
     	props.setProperty("pig.streaming.topology.name", "word_hist");
     	props.setProperty("pig.streaming.run.test.cluster", "true");
+    	props.setProperty("pig.exec.nocombiner", "true"); // Temporary to allow me to test out functionality.
 //    	props.setProperty("pig.streaming.run.test.cluster.wait_time", "60000");
 //    	props.setProperty("pig.streaming.debug", "true");
     	
@@ -100,6 +101,7 @@ public class TestStream extends TestCase {
     	
     	pig.registerQuery("count_gr = GROUP x BY word;");
     	pig.registerQuery("count = FOREACH count_gr GENERATE group AS word, COUNT(x) AS wc;");
+    	props.setProperty("hist_gr_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 4, \"expiration\": 300, \"serializer\":\"org.apache.pig.impl.storm.state.PigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
     	pig.registerQuery("hist_gr = GROUP count BY wc;");
     	pig.registerQuery("hist = FOREACH hist_gr GENERATE group AS wc, COUNT(count) AS freq;");
     	
@@ -107,14 +109,13 @@ public class TestStream extends TestCase {
     	pig.registerQuery("c = FOREACH q GENERATE COUNT(x);");
 //    	pig.registerQuery("STORE c INTO '/dev/null/1';");
     	
-//    	pig.registerQuery("STORE hist INTO '/dev/null/1';");
+    	pig.registerQuery("STORE hist INTO '/dev/null/1';");
 //    	pig.registerQuery("STORE x INTO '/dev/null/1';");
-    	pig.registerQuery("STORE count_gr INTO '/dev/null/1';");
+//    	pig.registerQuery("STORE count_gr INTO '/dev/null/1';");
 //    	pig.registerQuery("STORE count INTO '/dev/null/1';");
     	
 //    	ByteArrayOutputStream baos = new ByteArrayOutputStream();
-////    	pig.explain("count_gr", new PrintStream(baos));  	
-//    	pig.explain("c", new PrintStream(baos));  	
+//    	pig.explain("count", new PrintStream(baos));  	
 //    	System.err.print(new String(baos.toByteArray()));
             
     	

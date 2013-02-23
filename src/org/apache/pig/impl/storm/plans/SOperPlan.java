@@ -20,7 +20,7 @@ public class SOperPlan extends OperatorPlan<StormOper> {
     public String toString() {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream ps = new PrintStream(baos);
-        SPrinter printer = new SPrinter(ps, this);
+        SPrinter printer = new SPrinter(ps, this, null);
         printer.setVerbose(true);
         try {
             printer.visit();

@@ -60,12 +60,16 @@ public class TriMapFunc extends StormBaseFunction {
 		// TODO: We'll pass the input through the first element in the tuple with multiple map inputs		
 //		System.out.println("Map: " + tuple + " roots: " + roots + " leaf: " + leaf);
 		
+		// Determine if the tuple is positive or negative
+		Integer tive = tuple.getInteger(2);
+		// TODO: Act on it! -- only matters if combine is in play?
+		
 		// Bind the tuple.
 		roots.get(0).attachInput((Tuple) tuple.get(1));
 		
 		// And pull the results from the leaf.
 		try {
-			runPipeLine(collector);
+			runPipeLine(collector, tive);
 		} catch (ExecException e) {
 			e.printStackTrace();
 			throw new RuntimeException(e);
@@ -74,7 +78,7 @@ public class TriMapFunc extends StormBaseFunction {
 
 	private static final Tuple DUMMYTUPLE = null;
 	
-    public void collect(TridentCollector collector, Tuple tuple) throws ExecException {
+    public void collect(TridentCollector collector, Tuple tuple, Integer tive) throws ExecException {
 //    	System.out.println("Map collect: " + tuple + " mapKeyType: " + mapKeyType);
 
     	if (computeKey) {
@@ -91,18 +95,18 @@ public class TriMapFunc extends StormBaseFunction {
     		val.setIndex(index);
 
 //    		System.out.println("Emit k: " + key + " -- v: " + val);
-    		collector.emit(new Values(key, val));    		
+    		collector.emit(new Values(key, val, tive));    		
     	} else {
-    		collector.emit(new Values(null, tuple));
+    		collector.emit(new Values(null, tuple, tive));
     	}
     }
 	
-	void runPipeLine(TridentCollector collector) throws ExecException {
+	void runPipeLine(TridentCollector collector, Integer tive) throws ExecException {
 		while(true){
             Result res = leaf.getNext(DUMMYTUPLE);
             if(res.returnStatus==POStatus.STATUS_OK){
             	
-                collect(collector,(Tuple)res.result);
+                collect(collector, (Tuple)res.result, tive);
                 continue;
             }
             
