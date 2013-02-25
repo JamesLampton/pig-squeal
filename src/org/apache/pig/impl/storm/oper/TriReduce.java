@@ -152,7 +152,7 @@ public class TriReduce extends StormBaseFunction {
 		Object vl = tri_tuple.get(1);
 		List<NullableTuple> tuples;
 		if (vl instanceof NullableTuple) {
-			// Combine input
+			// Combine input FIXME: Remove this.
 			tuples = new ArrayList<NullableTuple>();
 			tuples.add((NullableTuple)(vl));
 			

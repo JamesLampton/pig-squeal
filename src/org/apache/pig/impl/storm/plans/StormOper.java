@@ -50,6 +50,7 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 	}
 
 	IRichSpout spout;
+	public boolean isCombined;
 
 	public void setSpout(IRichSpout spout) {
 		this.spout = spout;
@@ -103,6 +104,10 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 			return new Fields(field_pre + "_vl");
 		}
 		return new Fields(field_pre + "_k", field_pre + "_v", field_pre + "_tive");
+	}
+
+	public boolean getIsCombined() {
+		return isCombined;
 	}
 
 }

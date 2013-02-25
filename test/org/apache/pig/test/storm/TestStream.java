@@ -82,6 +82,7 @@ public class TestStream extends TestCase {
     	props.setProperty("pig.streaming.topology.name", "word_hist");
     	props.setProperty("pig.streaming.run.test.cluster", "true");
     	props.setProperty("pig.exec.nocombiner", "true"); // Temporary to allow me to test out functionality.
+    	props.setProperty("pig.exec.nocombiner", "false"); // Explicitly turn this on to develop stuff.
 //    	props.setProperty("pig.streaming.run.test.cluster.wait_time", "60000");
 //    	props.setProperty("pig.streaming.debug", "true");
     	
@@ -117,8 +118,6 @@ public class TestStream extends TestCase {
 //    	ByteArrayOutputStream baos = new ByteArrayOutputStream();
 //    	pig.explain("count", new PrintStream(baos));  	
 //    	System.err.print(new String(baos.toByteArray()));
-            
-    	
     }
 
 }

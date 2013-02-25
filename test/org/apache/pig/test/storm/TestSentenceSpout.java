@@ -25,6 +25,7 @@ public class TestSentenceSpout extends BaseRichSpout {
 
         List<List<byte[]>> test_tuples;
         test_tuples = new ArrayList<List<byte[]>>();
+        test_tuples.add(getSentList("pepsi pepsi pepsi pepsi pepsi pepsi pepsi."));
         test_tuples.add(getSentList("The quick brown fox jumped over the lazy dog."));
         test_tuples.add(getSentList("The quick brown fox jumped over the lazy dog."));
         test_tuples.add(getSentList("The quick brown fox jumped over the lazy dog."));

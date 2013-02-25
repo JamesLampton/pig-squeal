@@ -1,8 +1,15 @@
 package org.apache.pig.impl.storm.oper;
 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.io.ArrayWritable;
+import org.apache.hadoop.io.MapWritable;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Writable;
 import org.apache.pig.PigException;
 import org.apache.pig.backend.executionengine.ExecException;
 import org.apache.pig.backend.hadoop.HDataType;
@@ -13,7 +20,9 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.Physica
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POPackage;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.impl.io.NullableTuple;
+import org.apache.pig.impl.io.NullableUnknownWritable;
 import org.apache.pig.impl.io.PigNullableWritable;
+import org.apache.pig.impl.storm.state.CombineTupleWritable;
 
 import backtype.storm.tuple.Values;
 
@@ -22,7 +31,7 @@ import storm.trident.operation.CombinerAggregator;
 import storm.trident.operation.TridentCollector;
 import storm.trident.tuple.TridentTuple;
 
-public class TriCombinePersist implements CombinerAggregator {
+public class TriCombinePersist implements CombinerAggregator<CombineTupleWritable> {
 
 	private PhysicalPlan combinePlan;
 	private POPackage pack;
@@ -38,16 +47,11 @@ public class TriCombinePersist implements CombinerAggregator {
 		keyType = mapKeyType;
 		roots = plan.getRoots().toArray(DUMMYROOTARR);
 		leaf = plan.getLeaves().get(0);
-
-//		System.out.println("TriCombinePersist:");
-//		System.out.println(pack);
-//		System.out.println(plan.getRoots());
-//		System.out.println(leaf);
 	}
 	
-	Object runCombine(PigNullableWritable inKey, List<NullableTuple> tuplist) {
+	CombineTupleWritable runCombine(PigNullableWritable inKey, List<NullableTuple> tuplist) {
 		pack.attachInput(inKey, tuplist.iterator());
-		ArrayList<Object> ret = new ArrayList<Object>();
+		ArrayList<CombineTupleWritable> ret = new ArrayList<CombineTupleWritable>();
 		
 		try {
             Result res = pack.getNext(DUMMYTUPLE);
@@ -55,7 +59,9 @@ public class TriCombinePersist implements CombinerAggregator {
                 Tuple packRes = (Tuple)res.result;
                                 
                 if(combinePlan.isEmpty()){
-                	ret.add(new Values(null, packRes));
+                	CombineTupleWritable tw = new CombineTupleWritable(new Writable[] {new NullableUnknownWritable(null), packRes});
+                	
+                	ret.add(new CombineTupleWritable(new Writable[] {new NullableUnknownWritable(null), packRes}));
                 }
                 
                 for (int i = 0; i < roots.length; i++) {
@@ -79,8 +85,7 @@ public class TriCombinePersist implements CombinerAggregator {
                         val.setIndex(index);
 
                         // FIXME: When would the key be different from the input key?
-                        ret.add(new Values(outKey, val));
-
+                        ret.add(new CombineTupleWritable(new Writable[] {outKey, val}));
                         continue;
                     }
                     
@@ -129,7 +134,7 @@ public class TriCombinePersist implements CombinerAggregator {
 	
 	
 	@Override
-	public Object init(TridentTuple tri_tuple) {
+	public CombineTupleWritable init(TridentTuple tri_tuple) {
 		
 //		System.out.println("TriCombinePersist.init(): " + tri_tuple);
 		
@@ -140,30 +145,29 @@ public class TriCombinePersist implements CombinerAggregator {
 	}
 
 	@Override
-	public Object combine(Object val1, Object val2) {
-		List<Object> vl1 = (List<Object>) val1;
-		List<Object> vl2 = (List<Object>) val2;
-		Object ret = null;
+	public CombineTupleWritable combine(CombineTupleWritable val1, CombineTupleWritable val2) {
+		CombineTupleWritable ret = null;
 		
-//		System.out.println("TriCombine --  v1: " + vl1 + "  v2: " + vl2);
+//		System.out.println("TriCombine --  v1: " + val1 + "  v2: " + val2);
 		
 		PigNullableWritable inKey = null;
 		ArrayList<NullableTuple> tuplist = new ArrayList<NullableTuple>();
 
-		if (vl1 != null) {
+		if (val1 != null) {
 			if (inKey == null) {
 				// TODO: Check and make sure they're the same?
-				inKey = (PigNullableWritable) vl1.get(0);					
+				inKey = (PigNullableWritable) val1.get(0);					
 			}
-			tuplist.add((NullableTuple) vl1.get(1));
+//			System.out.println("v1: " + val1.get(0) + " " + val1.get(1));
+			tuplist.add((NullableTuple) val1.get(1));
 		}
 
-		if (vl2 != null) {
+		if (val2 != null) {
 			if (inKey == null) {
 				// TODO: Check and make sure they're the same?
-				inKey = (PigNullableWritable) vl2.get(0);					
+				inKey = (PigNullableWritable) val2.get(0);
 			}
-			tuplist.add((NullableTuple) vl2.get(1));
+			tuplist.add((NullableTuple) val2.get(1));
 		}
 
 		if (inKey != null) {
@@ -175,7 +179,7 @@ public class TriCombinePersist implements CombinerAggregator {
 	}
 
 	@Override
-	public Object zero() {
+	public CombineTupleWritable zero() {
 		return null;
 	}
 
@@ -185,5 +189,11 @@ public class TriCombinePersist implements CombinerAggregator {
 			Values stuff = (Values) tuple.get(1);
 			collector.emit(new Values(stuff.get(1)));
 		}
+	}
+	
+	static public List<NullableTuple> getTuples(CombineTupleWritable state) {
+		List<NullableTuple>  tuples = new ArrayList<NullableTuple>();
+		tuples.add((NullableTuple) state.get(1));
+		return tuples;
 	}
 }

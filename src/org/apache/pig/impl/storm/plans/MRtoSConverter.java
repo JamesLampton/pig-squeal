@@ -63,7 +63,7 @@ public class MRtoSConverter extends MROpPlanVisitor {
 	}
 	
 	String getAlias(PhysicalPlan p, boolean useRoots) {
-//		System.out.println(useRoots + " Reduce Roots: " + p.getRoots() + " Leaves: " + p.getLeaves());
+//		System.out.println(useRoots + " Roots: " + p.getRoots() + " Leaves: " + p.getLeaves());
 		if (useRoots) {
 			PhysicalOperator root = p.getRoots().get(0);
 			return root.getAlias();
@@ -129,6 +129,9 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		// Map: We have out input squared away, lets create the foreach function.
 		// TODO -- Replace loads
 		mo.setPlan(mr.mapPlan);
+		if (mr.combinePlan.size() > 0) {
+			mo.isCombined = true;
+		}
 		
 		// If this is a Map-only task, we need to find the store and create the link for the output.
 		if (mr.reducePlan.size() == 0) {
@@ -139,7 +142,7 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		// Persist SOP
 		StormOper po;
 		if (mr.combinePlan.size() > 0) {
-			po = getSOp(StormOper.OpType.COMBINE_PERSIST, getAlias(mr.combinePlan, true));
+			po = getSOp(StormOper.OpType.COMBINE_PERSIST, getAlias(mr.combinePlan, false));
 			// Combine SOP
 			po.setPlan(mr.combinePlan);
 			po.mapKeyType = mr.mapKeyType;

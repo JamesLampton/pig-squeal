@@ -110,9 +110,10 @@ public class Main {
 				// FIXME: Make all inputs SOPs so we can track the input fields for MAP.
 				output = input.each(
 							input.getOutputFields(), 
-							new TriMapFunc(sop.getPlan(), sop.mapKeyType),
+							new TriMapFunc(sop.getPlan(), sop.mapKeyType, sop.getIsCombined()),
 							output_fields
 						).project(output_fields);
+				output.each(output.getOutputFields(), new Debug());
 			} else if (sop.getType() == StormOper.OpType.BASIC_PERSIST || sop.getType() == StormOper.OpType.COMBINE_PERSIST) {
 				// Group stuff.
 				if (sop.getType() == StormOper.OpType.BASIC_PERSIST) {
@@ -136,17 +137,16 @@ public class Main {
 							.persistentAggregate(
 								sop.getStateFactory(pc),
 								gr_output.getOutputFields(),
-								// TODO: Handle the negative stuff appropriately.
-								new TriCombinePersist(pack, sop.getPlan(), sop.mapKeyType), 
-								new Fields(output_fields.get(0) + "_tmp")
-							).newValuesStream();
-
-					// Decode the state variable to tuples.
-					output = output.each(
-								output.getOutputFields(), 
-								new TriCombinePersist.StateClean(), 
-								output_fields
-							).project(new Fields(input.getOutputFields().get(0), output_fields.get(0)));
+								new CombineWrapper(new TriCombinePersist(pack, sop.getPlan(), sop.mapKeyType)), 
+								new Fields(output_fields.get(0))
+							).newValuesStream()
+							.project(new Fields(input.getOutputFields().get(0), output_fields.get(0)));
+//					// Decode the state variable to tuples.
+//					output = output.each(
+//								output.getOutputFields(), 
+//								new TriCombinePersist.StateClean(), 
+//								output_fields
+//							).project(new Fields(input.getOutputFields().get(0), output_fields.get(0)));
 				}
 			} else if (sop.getType() == StormOper.OpType.REDUCE_DELTA) {
 				// Need to reduce

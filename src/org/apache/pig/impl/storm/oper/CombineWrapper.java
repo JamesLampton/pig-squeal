@@ -5,7 +5,9 @@ import java.util.List;
 import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.mapred.join.TupleWritable;
 import org.apache.pig.impl.io.NullableTuple;
+import org.apache.pig.impl.storm.state.CombineTupleWritable;
 
 import storm.trident.operation.CombinerAggregator;
 import storm.trident.tuple.TridentTuple;
@@ -41,7 +43,7 @@ public class CombineWrapper implements CombinerAggregator<MapWritable> {
 		// Assuming that val1 came from the cache/state.
 		if (val1.get(CUR) != null) {
 			// FIXME: Create a MapWritable generator that always has the appropriate classes?
-			ret.put(LAST, agg.combine(agg.zero(), val1.get(CUR)));
+			ret.put(LAST, val1.get(CUR));
 		}
 		ret.put(CUR, agg.combine(getDefault(val1, CUR), getDefault(val2, CUR)));
 			
@@ -54,10 +56,16 @@ public class CombineWrapper implements CombinerAggregator<MapWritable> {
 	}
 
 	public static List<NullableTuple> getTuples(MapWritable m, Text which) {
-		MapWritable state = (MapWritable) m.get(which);
+
+		Writable state = m.get(which);
 		if (state == null) {
 			return null;
 		}
-		return TriBasicPersist.getTuples(state);
+
+		if (state instanceof MapWritable) {
+			return TriBasicPersist.getTuples((MapWritable) state);
+		} else {
+			return TriCombinePersist.getTuples((CombineTupleWritable) state);
+		}
 	}	
 }
