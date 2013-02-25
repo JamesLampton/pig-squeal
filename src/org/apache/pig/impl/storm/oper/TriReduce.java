@@ -148,35 +148,23 @@ public class TriReduce extends StormBaseFunction {
 //		System.out.println("TriReduce input: " + tri_tuple);
 		
 		PigNullableWritable key = (PigNullableWritable) tri_tuple.get(0);
-		
-		Object vl = tri_tuple.get(1);
-		List<NullableTuple> tuples;
-		if (vl instanceof NullableTuple) {
-			// Combine input FIXME: Remove this.
-			tuples = new ArrayList<NullableTuple>();
-			tuples.add((NullableTuple)(vl));
-			
-			runReduce(key, tuples, collector);
-		} else if (vl instanceof MapWritable) {
-			// BasicPersist input
-			MapWritable m = (MapWritable) vl;
-						
-			FakeCollector fc = new FakeCollector(collector);
-			
-			// Calculate the previous values.
-			tuples = CombineWrapper.getTuples(m, CombineWrapper.LAST);
-			if (tuples != null) {
-				runReduce(key, tuples, fc);
-			}
-			
-			// Calculate the current values.
-			tuples = CombineWrapper.getTuples(m, CombineWrapper.CUR);
-			fc.switchToCur();
+	
+		MapWritable m = (MapWritable) tri_tuple.get(1);
+		FakeCollector fc = new FakeCollector(collector);
+
+		// Calculate the previous values.
+		List<NullableTuple> tuples = CombineWrapper.getTuples(m, CombineWrapper.LAST);
+		if (tuples != null) {
 			runReduce(key, tuples, fc);
-			
-			// Emit positive and negative values.
-			fc.emitValues();
 		}
+
+		// Calculate the current values.
+		tuples = CombineWrapper.getTuples(m, CombineWrapper.CUR);
+		fc.switchToCur();
+		runReduce(key, tuples, fc);
+
+		// Emit positive and negative values.
+		fc.emitValues();
 	}
 
 	public void runReduce(PigNullableWritable key, List<NullableTuple> tuples, TridentCollector collector) {

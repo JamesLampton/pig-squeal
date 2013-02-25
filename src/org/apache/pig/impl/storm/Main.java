@@ -113,7 +113,7 @@ public class Main {
 							new TriMapFunc(sop.getPlan(), sop.mapKeyType, sop.getIsCombined()),
 							output_fields
 						).project(output_fields);
-				output.each(output.getOutputFields(), new Debug());
+//				output.each(output.getOutputFields(), new Debug());
 			} else if (sop.getType() == StormOper.OpType.BASIC_PERSIST || sop.getType() == StormOper.OpType.COMBINE_PERSIST) {
 				// Group stuff.
 				if (sop.getType() == StormOper.OpType.BASIC_PERSIST) {
@@ -141,12 +141,6 @@ public class Main {
 								new Fields(output_fields.get(0))
 							).newValuesStream()
 							.project(new Fields(input.getOutputFields().get(0), output_fields.get(0)));
-//					// Decode the state variable to tuples.
-//					output = output.each(
-//								output.getOutputFields(), 
-//								new TriCombinePersist.StateClean(), 
-//								output_fields
-//							).project(new Fields(input.getOutputFields().get(0), output_fields.get(0)));
 				}
 			} else if (sop.getType() == StormOper.OpType.REDUCE_DELTA) {
 				// Need to reduce

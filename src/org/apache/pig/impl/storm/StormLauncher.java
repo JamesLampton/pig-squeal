@@ -77,7 +77,7 @@ public class StormLauncher extends Launcher {
 		try {
 			Main m = new Main(pc, sp);
 			// TODO
-			m.launch();
+//			m.launch();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -128,11 +128,6 @@ public class StormLauncher extends Launcher {
 	public SOperPlan compile(PhysicalPlan php, PigContext pc) 
 			throws PlanException, IOException, VisitorException {
 		MapReduceLauncher mrlauncher = new MapReduceLauncher();
-		// FIXME: Temporary to allow me to test out functionality.
-		// If nocombiner isn't explicitly set, turn it on.
-		if (pc.getProperties().get("pig.exec.nocombiner") == null) {
-			pc.getProperties().setProperty("pig.exec.nocombiner", "true"); 
-		}
 		MROperPlan mrp = mrlauncher.compile(php, pc);
 		
 		MRtoSConverter converter = new MRtoSConverter(mrp);
