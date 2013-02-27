@@ -2,17 +2,21 @@ package org.apache.pig.impl.storm.plans;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.impl.plan.OperatorPlan;
 import org.apache.pig.impl.plan.VisitorException;
 
 public class SOperPlan extends OperatorPlan<StormOper> {
 	
 	public Set<String> UDFs = new HashSet<String>();
-
+	public Map<POLoad, StormOper> PLSpoutLink = new HashMap<POLoad, StormOper>();
+	
 	/* (non-Javadoc)
      * @see java.lang.Object#toString()
      */
@@ -30,4 +34,13 @@ public class SOperPlan extends OperatorPlan<StormOper> {
         }
         return baos.toString();
     }
+
+	public void addPLSpoutLink(StormOper spout, POLoad pl) {
+		// Note, this doesn't survive a clone right now...
+		PLSpoutLink.put(pl, spout);
+	}
+	
+	public StormOper getPLSpoutLink(POLoad pl) {
+		return PLSpoutLink.get(pl);
+	}
 }

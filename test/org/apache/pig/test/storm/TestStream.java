@@ -25,6 +25,8 @@ import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
 
 import org.apache.pig.impl.io.FileLocalizer;
+import org.apache.pig.test.MiniCluster;
+import org.apache.pig.test.Util;
 
 import org.apache.pig.backend.executionengine.ExecException;
 
@@ -64,28 +66,123 @@ import backtype.storm.topology.base.BaseRichSpout;
 public class TestStream extends TestCase {
     
     private final Log log = LogFactory.getLog(getClass());
-
+    private static MiniCluster cluster;
+    private static final String STOPWORDS_FILE = "stop_words.txt";
+	private static final String[] STOPWORDS = {
+		"a", "able", "about", "across", "after", "all", "almost", "also", 
+		"am", "among", "an", "and", "any", "are", "as", "at", "be", "because", 
+		"been", "but", "by", "can", "cannot", "could", "dear", "did", "do", 
+		"does", "either", "else", "ever", "every", "for", "from", "get", 
+		"got", "had", "has", "have", "he", "her", "hers", "him", "his", 
+		"how", "however", "i", "if", "in", "into", "is", "it", "its", 
+		"just", "least", "let", "like", "likely", "may", "me", "might", 
+		"most", "must", "my", "neither", "no", "nor", "not", "of", "off", 
+		"often", "on", "only", "or", "other", "our", "own", "rather", "said", 
+		"say", "says", "she", "should", "since", "so", "some", "than", "that", 
+		"the", "their", "them", "then", "there", "these", "they", "this", "tis", 
+		"to", "too", "twas", "us", "wants", "was", "we", "were", "what", "when", 
+		"where", "which", "while", "who", "whom", "why", "will", "with", "would", 
+		"yet", "you", "your", "que", "lol", "dont"};
+    
     PigServer pig;
     String test_tuples;
-    
+	private Properties props;
+    static boolean runMiniCluster = false;
+	
     @Override
     @Before
-    public void setUp() throws Exception{
-    	pig = new PigServer("storm");    	
+    public void setUp() throws Exception {
+    	System.setProperty("hadoop.log.dir", "build/test/logs");
+    	
+    	if (runMiniCluster) {
+    		cluster = MiniCluster.buildCluster();
+    		// Write out a stop list.    	
+    		Util.createInputFile(cluster, STOPWORDS_FILE, STOPWORDS);
+        	pig = new PigServer(ExecType.STORM, cluster.getProperties());
+    	} else {
+        	pig = new PigServer("storm-local");
+    	}
+    	
+    	props = pig.getPigContext().getProperties();    	
+    	props.setProperty("pig.streaming.run.test.cluster", "true");
+//    	props.setProperty("pig.streaming.run.test.cluster.wait_time", "60000");
+//    	props.setProperty("pig.streaming.debug", "true");
+    	
+    }
+
+    @AfterClass
+    public static void oneTimeTearDown() throws Exception {
+    	if (runMiniCluster) {
+    		cluster.shutDown();
+    	}
+    }
+    
+    @After
+    public void tearDown() throws Exception {
+    	if (runMiniCluster) {
+    		Util.deleteFile(cluster, STOPWORDS_FILE);
+    	}
+    }
+    
+    public void explain(String alias) throws IOException {
+    	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    	pig.explain(alias, new PrintStream(baos));  	
+    	System.err.print(new String(baos.toByteArray()));    	
+    }
+    
+    @Test
+    public void testUnion() throws Exception {
+    	pig.registerQuery("x = LOAD '/dev/null/0' USING " +
+    			"org.apache.pig.impl.storm.SpoutWrapper(" +
+    				"'org.apache.pig.test.storm.TestSentenceSpout') AS (sentence:chararray);");
+    	pig.registerQuery("x = FOREACH x GENERATE FLATTEN(TOKENIZE(sentence));");
+    	pig.registerQuery("x = FOREACH x GENERATE LOWER($0) AS word;");
+
+    	pig.registerQuery("y = LOAD '/dev/null/1' USING " +
+    			"org.apache.pig.impl.storm.SpoutWrapper(" +
+    				"'org.apache.pig.test.storm.TestSentenceSpout') AS (sentence:chararray);");
+    	
+    	pig.registerQuery("q = UNION x,y;");
+    	
+    	pig.registerQuery("y = FOREACH y GENERATE FLATTEN(TOKENIZE(sentence));");
+    	pig.registerQuery("y = FOREACH y GENERATE LOWER($0) AS word;");
+    	
+    	pig.registerQuery("z = UNION x,y;");
+    	pig.registerQuery("r = UNION q,z;");
+
+//    	explain("r");
+    }
+    
+    @Test
+    public void testJoin() throws Exception {
+    	pig.registerQuery("x = LOAD '/dev/null/0' USING " +
+    			"org.apache.pig.impl.storm.SpoutWrapper(" +
+    				"'org.apache.pig.test.storm.TestSentenceSpout') AS (sentence:chararray);");
+    	pig.registerQuery("x = FOREACH x GENERATE FLATTEN(TOKENIZE(sentence));");
+    	pig.registerQuery("x = FOREACH x GENERATE LOWER($0) AS word, 'x';");
+
+    	pig.registerQuery("y = LOAD '/dev/null/1' USING " +
+    			"org.apache.pig.impl.storm.SpoutWrapper(" +
+    				"'org.apache.pig.test.storm.TestSentenceSpout2') AS (sentence:chararray);");
+    	pig.registerQuery("y = FOREACH y GENERATE FLATTEN(TOKENIZE(sentence));");
+    	pig.registerQuery("y = FOREACH y GENERATE LOWER($0) AS word, 'y';");
+
+    	pig.registerQuery("stoplist = LOAD '" + STOPWORDS_FILE + "' AS (stopword:chararray);");
+
+    	pig.registerQuery("wordsr = JOIN x BY word, stoplist BY stopword USING 'replicated';");
+//    	explain("wordsr");
+    	
+    	pig.registerQuery("words = JOIN x BY word, stoplist BY stopword;");
+//    	explain("words");
+
+    	pig.registerQuery("silly = JOIN x BY word, y BY word;");
+//    	pig.registerQuery("STORE x INTO 'fake_path';");
+    	explain("silly");    	
+    	pig.registerQuery("STORE silly INTO 'fake_path';");
     }
     
     @Test
     public void testWCHist () throws Exception {
-    	
-    	Properties props = pig.getPigContext().getProperties();
-    	
-    	props.setProperty("pig.streaming.topology.name", "word_hist");
-    	props.setProperty("pig.streaming.run.test.cluster", "true");
-    	props.setProperty("pig.exec.nocombiner", "true"); // Temporary to allow me to test out functionality.
-    	props.setProperty("pig.exec.nocombiner", "false"); // Explicitly turn this on to develop stuff.
-//    	props.setProperty("pig.streaming.run.test.cluster.wait_time", "60000");
-//    	props.setProperty("pig.streaming.debug", "true");
-    	
     	// storm.trident.testing.FixedBatchSpout
     	// backtype.storm.testing.FixedTupleSpout
     	pig.registerQuery("x = LOAD '/dev/null' USING " +
@@ -114,11 +211,9 @@ public class TestStream extends TestCase {
 //    	pig.registerQuery("STORE hist INTO '/dev/null/1';");
 //    	pig.registerQuery("STORE x INTO '/dev/null/1';");
 //    	pig.registerQuery("STORE count_gr INTO '/dev/null/1';");
-    	pig.registerQuery("STORE count INTO '/dev/null/1';");
+//    	pig.registerQuery("STORE count INTO '/dev/null/1';");
     	
-//    	ByteArrayOutputStream baos = new ByteArrayOutputStream();
-//    	pig.explain("count", new PrintStream(baos));  	
-//    	System.err.print(new String(baos.toByteArray()));
+//    	explain("hist");
     }
 
 }

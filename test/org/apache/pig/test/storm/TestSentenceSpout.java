@@ -21,21 +21,25 @@ public class TestSentenceSpout extends BaseRichSpout {
 
 	private FixedTupleSpout sp;
     
-    public TestSentenceSpout() {
-
-        List<List<byte[]>> test_tuples;
-        test_tuples = new ArrayList<List<byte[]>>();
+	static  List<List<byte[]>> test_tuples;
+	static {
+		test_tuples = new ArrayList<List<byte[]>>();
         test_tuples.add(getSentList("pepsi pepsi pepsi pepsi pepsi pepsi pepsi."));
         test_tuples.add(getSentList("The quick brown fox jumped over the lazy dog."));
         test_tuples.add(getSentList("The quick brown fox jumped over the lazy dog."));
         test_tuples.add(getSentList("The quick brown fox jumped over the lazy dog."));
         test_tuples.add(getSentList("Mary had a little lamb."));
         test_tuples.add(getSentList("This will be encoded into json."));
-        test_tuples.add(getSentList("defeat of deduct went over defence before detail?"));   	
-        
-    	this.sp = new FixedTupleSpout(test_tuples);
-
+        test_tuples.add(getSentList("defeat of deduct went over defence before detail?"));
 	}
+	
+    public TestSentenceSpout() {
+        this(test_tuples);
+	}
+    
+    public TestSentenceSpout(List<List<byte[]>> t) {
+    	this.sp = new FixedTupleSpout(t);    	
+    }
 
 	@Override
 	public void open(Map conf, TopologyContext context,

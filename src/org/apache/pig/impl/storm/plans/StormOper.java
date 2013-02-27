@@ -68,14 +68,12 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 
 	@Override
 	public boolean supportsMultipleInputs() {
-		// TODO Auto-generated method stub
-		return false;
+		return true;
 	}
 
 	@Override
 	public boolean supportsMultipleOutputs() {
-		// TODO Auto-generated method stub
-		return false;
+		return true;
 	}
 
 	@Override

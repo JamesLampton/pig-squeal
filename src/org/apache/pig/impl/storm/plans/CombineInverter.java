@@ -11,17 +11,28 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.Physica
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POForEach;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLocalRearrange;
 import org.apache.pig.impl.plan.PlanException;
+import org.apache.pig.impl.util.MultiMap;
 
 public class CombineInverter {
 	private PhysicalPlan plan;
+	private MultiMap<PhysicalOperator, PhysicalOperator> opmap;
 
 	public CombineInverter(PhysicalPlan plan) {
 		this.plan = plan;
 	}
-		
+	
+	public MultiMap<PhysicalOperator, PhysicalOperator> getLastOpMap() {
+		return opmap;
+	}
+	
 	public PhysicalPlan getInverse() throws CloneNotSupportedException, PlanException {
+		opmap = new MultiMap<PhysicalOperator, PhysicalOperator>();
+		plan.setOpMap(opmap);
+		
 		// Clone the plan.
 		PhysicalPlan ret = plan.clone();
+		
+		plan.resetOpMap();
 
 		// Find the ForEach with combiner UDFs
 		PhysicalOperator l = ret.getLeaves().get(0);

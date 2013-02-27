@@ -77,7 +77,7 @@ public class StormLauncher extends Launcher {
 		try {
 			Main m = new Main(pc, sp);
 			// TODO
-//			m.launch();
+			m.launch();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

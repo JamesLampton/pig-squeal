@@ -17,6 +17,7 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOpe
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
 import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
+import org.apache.pig.data.TupleFactory;
 import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.io.PigNullableWritable;
 import org.apache.pig.impl.plan.PlanException;
@@ -35,31 +36,28 @@ public class TriMapFunc extends StormBaseFunction {
 	private PlanExecutor negMapPlanExecutor = null;
 	
 	class PlanExecutor implements Serializable {
-		private PhysicalPlan plan;
-		private List<PhysicalOperator> roots;
 		private PhysicalOperator leaf;
 		private boolean computeKey;
 		private byte mapKeyType;
 		private boolean errorInMap;
+		private PhysicalOperator root;
 
-		protected PlanExecutor(PhysicalPlan physicalPlan, byte mapKeyType) {
-			plan = physicalPlan;
-			roots = plan.getRoots();
+		protected PlanExecutor(PhysicalPlan plan, byte mapKeyType, PhysicalOperator root) {
+			this.root = root;
 			
 			leaf = plan.getLeaves().get(0);
-			if (leaf.getClass().isAssignableFrom(POLocalRearrange.class)) {
-				computeKey = true;
-			}
 			if (leaf.getClass().isAssignableFrom(POStore.class)) {
 				// We need to actually peel the POStore off.
 				leaf = plan.getPredecessors(leaf).get(0);
+			} else {
+				computeKey = true;
 			}
 			this.mapKeyType = mapKeyType;
 		}
 		
 		public void execute(TridentTuple tuple, TridentCollector collector, Integer tive) {
 			// Bind the tuple.
-			roots.get(0).attachInput((Tuple) tuple.get(1));
+			root.attachInput((Tuple) tuple.get(1));
 			
 			// And pull the results from the leaf.
 			try {
@@ -88,7 +86,7 @@ public class TriMapFunc extends StormBaseFunction {
 //	    		System.out.println("Emit k: " + key + " -- v: " + val);
 	    		collector.emit(new Values(key, val, tive));    		
 	    	} else {
-	    		collector.emit(new Values(null, tuple, tive));
+	    		collector.emit(new Values(null, new NullableTuple(tuple), tive));
 	    	}
 	    }
 		
@@ -130,7 +128,15 @@ public class TriMapFunc extends StormBaseFunction {
 		}
 	}
 
-	public TriMapFunc(PhysicalPlan physicalPlan, byte mapKeyType, boolean isCombined) {		
+	public TriMapFunc(PhysicalPlan physicalPlan, byte mapKeyType, boolean isCombined, PhysicalOperator activeRoot) {
+		// Pull out the active root and get the predecessor.
+		List<PhysicalOperator> roots = physicalPlan.getSuccessors(activeRoot);
+		if (roots.size() > 1) {
+			throw new RuntimeException("Expected only a single successor from the active root.");
+		}
+//		System.out.println("TriMapFunc: " + activeRoot + " -> " + roots.get(0));
+		activeRoot = roots.get(0);
+		
 		// Remove the root
 		List<PhysicalOperator> remove_roots = new ArrayList<PhysicalOperator>(physicalPlan.getRoots());
 		for (PhysicalOperator pl : remove_roots) {
@@ -138,13 +144,17 @@ public class TriMapFunc extends StormBaseFunction {
 			physicalPlan.remove(pl);
 		}
 
-		mapPlanExecutor = new PlanExecutor(physicalPlan, mapKeyType);
+		mapPlanExecutor = new PlanExecutor(physicalPlan, mapKeyType, activeRoot);
 		
 		// See if this plan requires a negative pipeline.
 		if (isCombined) {
 			CombineInverter ci = new CombineInverter(physicalPlan);
 			try {
-				negMapPlanExecutor  = new PlanExecutor(ci.getInverse(), mapKeyType);
+				PhysicalPlan ciClone = ci.getInverse();
+				// track activeRoot through the clone.
+				PhysicalOperator ciActiveRoot = ci.getLastOpMap().get(activeRoot).get(0);
+				
+				negMapPlanExecutor  = new PlanExecutor(ciClone, mapKeyType, ciActiveRoot);
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}			
@@ -153,12 +163,10 @@ public class TriMapFunc extends StormBaseFunction {
 	
 	@Override
 	public void execute(TridentTuple tuple, TridentCollector collector) {
-		// TODO: We'll pass the input through the first element in the tuple with multiple map inputs		
-//		System.out.println("Map: " + tuple + " roots: " + roots + " leaf: " + leaf);
+//		System.out.println("Map: " + tuple + " activeRoot: " + mapPlanExecutor.root + " leaf: " + mapPlanExecutor.leaf);
 		
 		// Determine if the tuple is positive or negative
 		Integer tive = tuple.getInteger(2);
-		// TODO: Act on it! -- only matters if combine is in play?
 		
 		if (negMapPlanExecutor != null && tive < 0) {
 			negMapPlanExecutor.execute(tuple, collector, tive);

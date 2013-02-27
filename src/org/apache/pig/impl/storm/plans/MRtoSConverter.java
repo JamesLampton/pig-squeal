@@ -95,12 +95,13 @@ public class MRtoSConverter extends MROpPlanVisitor {
 			String fn = pl.getLFile().getFileName();
 			
 			// If it's a Spout, add a new StormOper for it.
-			if (!rootMap.containsKey(fn) && pl.getLoadFunc().getClass().isAssignableFrom(SpoutWrapper.class)) {
+			if (!rootMap.containsKey(fn) && pl.getLoadFunc() instanceof SpoutWrapper) {
 				// Create a new StormOper for this spout.
-				StormOper spout = getSOp(StormOper.OpType.SPOUT, null);
+				StormOper spout = getSOp(StormOper.OpType.SPOUT, po.getAlias());
 				SpoutWrapper sw = ((SpoutWrapper)pl.getLoadFunc());
 				spout.setSpout(sw.getSpout());
 				splan.add(spout);
+				splan.addPLSpoutLink(spout, pl);
 				rootMap.put(fn, spout);
 
 				// Add the spout's UDF so it gets picked up by the Jar.
@@ -123,7 +124,6 @@ public class MRtoSConverter extends MROpPlanVisitor {
 				// Add this map to the waiting list for the Stream
 				wait.add(mo);
 			}
-
 		}
 		
 		// Map: We have out input squared away, lets create the foreach function.

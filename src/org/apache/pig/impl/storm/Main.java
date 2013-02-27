@@ -9,6 +9,9 @@ import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.PhysicalOperator;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhysicalPlan;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POPackage;
 import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.plan.DependencyOrderWalker;
@@ -22,6 +25,7 @@ import org.apache.pig.impl.storm.oper.TriReduce;
 import org.apache.pig.impl.storm.plans.SOpPlanVisitor;
 import org.apache.pig.impl.storm.plans.SOperPlan;
 import org.apache.pig.impl.storm.plans.StormOper;
+import org.apache.pig.impl.util.MultiMap;
 import org.apache.pig.impl.util.ObjectSerializer;
 
 import backtype.storm.Config;
@@ -71,14 +75,62 @@ public class Main {
 			this.topology = topology;
 			this.pc = pc;
 		}
-
-		public void visitSOp(StormOper sop) throws VisitorException {
-			Stream input = null;
-			Stream output = null;
-			Fields output_fields = sop.getOutputFields();
+		
+		Stream processMapSOP(StormOper sop) throws CloneNotSupportedException {
+			Fields output_fields = sop.getOutputFields();			
+			List<Stream> outputs = new ArrayList<Stream>();
+			Stream output;
+			
+			// Cycle through the inputs and create a clone map for each.
+			// This handles the cases for multiple inputs without breaking the plan apart.
+			for (PhysicalOperator po : sop.getPlan().getRoots()) {
+				StormOper input_sop = splan.getPLSpoutLink((POLoad) po);
+				Stream input = sop_streams.get(input_sop);
+				
+				MultiMap<PhysicalOperator, PhysicalOperator> opmap = new MultiMap<PhysicalOperator, PhysicalOperator>();
+				sop.getPlan().setOpMap(opmap);
+				PhysicalPlan clonePlan = sop.getPlan().clone();
+				if (opmap.get(po).size() > 1) {
+					throw new RuntimeException("Didn't expect activeRoot to have multiple values in cloned plan!");
+				}
+				PhysicalOperator cloneActiveRoot = opmap.get(po).get(0);
+				
+				output = input.each(
+							input.getOutputFields(), 
+							new TriMapFunc(clonePlan, sop.mapKeyType, sop.getIsCombined(), cloneActiveRoot),
+							output_fields
+						).project(output_fields);
+				outputs.add(output);
+			}
+			
+			if (outputs.size() == 1) {
+				output = outputs.get(0);
+			} else {
+				output = topology.merge(outputs);
+			}
+			
+			// Optional debug.
+			output.each(output.getOutputFields(), new Debug());
+			
+			return output;
+		}
+		
+		List<Stream> getInputs(StormOper sop) {
 			// Change to list?
 			List<Stream> inputs = new ArrayList<Stream>();
+			
+			// Link to the previous streams.
+			for (StormOper pre_sop : splan.getPredecessors(sop)) {
+				inputs.add(sop_streams.get(pre_sop));
+			}
 
+			return inputs;
+		}
+
+		public void visitSOp(StormOper sop) throws VisitorException {
+			Stream output = null;
+			Fields output_fields = sop.getOutputFields();
+			
 			if (sop.getType() == StormOper.OpType.SPOUT) {
 				output = topology.newStream(sop.getOperatorKey().toString(), sop.getLoadFunc());
 				
@@ -93,27 +145,17 @@ public class Main {
 
 				return;
 			}
-			
-			// Link to the previous streams.
-			for (StormOper pre_sop : splan.getPredecessors(sop)) {
-				inputs.add(sop_streams.get(pre_sop));
-			}
-			
-			if (inputs.size() == 1) {
-				input = inputs.get(0);
-			} else {
-				input = topology.merge(inputs);
-			}
 
+			// Default value for non-maps.
+			Stream input = getInputs(sop).get(0);
+			
 			// Create the current operator on the topology
 			if (sop.getType() == StormOper.OpType.MAP) {
-				// FIXME: Make all inputs SOPs so we can track the input fields for MAP.
-				output = input.each(
-							input.getOutputFields(), 
-							new TriMapFunc(sop.getPlan(), sop.mapKeyType, sop.getIsCombined()),
-							output_fields
-						).project(output_fields);
-//				output.each(output.getOutputFields(), new Debug());
+				try {
+					output = processMapSOP(sop);
+				} catch (CloneNotSupportedException e) {
+					throw new RuntimeException(e);
+				}
 			} else if (sop.getType() == StormOper.OpType.BASIC_PERSIST || sop.getType() == StormOper.OpType.COMBINE_PERSIST) {
 				// Group stuff.
 				if (sop.getType() == StormOper.OpType.BASIC_PERSIST) {
