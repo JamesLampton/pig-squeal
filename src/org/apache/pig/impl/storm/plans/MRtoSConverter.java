@@ -176,6 +176,7 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		// Start walking.
 		try {
 			visit();
+			splan.setRootMap(rootMap);
 		} catch (VisitorException e) {
 			e.printStackTrace();
 		}

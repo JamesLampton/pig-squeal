@@ -6,6 +6,7 @@ import java.util.List;
 import org.apache.pig.data.DataByteArray;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.data.TupleFactory;
+import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.storm.SpoutWrapper;
 
 import backtype.storm.tuple.Values;
@@ -38,7 +39,7 @@ public class TriMakePigTuples extends BaseFunction {
 			}
 		}
 		
-		collector.emit(new Values(null, tf.newTupleNoCopy(ret_arr), POS));
+		collector.emit(new Values(null, new NullableTuple(tf.newTupleNoCopy(ret_arr)), POS));
 	}
 
 }

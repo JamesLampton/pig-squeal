@@ -1,5 +1,7 @@
 package org.apache.pig.impl.storm.oper;
 
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import org.apache.hadoop.io.MapWritable;
@@ -61,11 +63,18 @@ public class CombineWrapper implements CombinerAggregator<MapWritable> {
 		if (state == null) {
 			return null;
 		}
+		
+		List<NullableTuple> ret;
 
 		if (state instanceof MapWritable) {
-			return TriBasicPersist.getTuples((MapWritable) state);
+			ret = TriBasicPersist.getTuples((MapWritable) state);
 		} else {
-			return TriCombinePersist.getTuples((CombineTupleWritable) state);
+			ret = TriCombinePersist.getTuples((CombineTupleWritable) state);
 		}
+		
+		// Sort the tuples as the shuffle would.
+		Collections.sort(ret);
+		
+		return ret;
 	}	
 }

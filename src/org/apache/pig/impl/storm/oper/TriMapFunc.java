@@ -22,6 +22,7 @@ import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.io.PigNullableWritable;
 import org.apache.pig.impl.plan.PlanException;
 import org.apache.pig.impl.storm.plans.CombineInverter;
+import org.apache.pig.impl.util.MultiMap;
 
 import backtype.storm.tuple.Values;
 
@@ -57,7 +58,7 @@ public class TriMapFunc extends StormBaseFunction {
 		
 		public void execute(TridentTuple tuple, TridentCollector collector, Integer tive) {
 			// Bind the tuple.
-			root.attachInput((Tuple) tuple.get(1));
+			root.attachInput((Tuple) ((PigNullableWritable) tuple.get(1)).getValueAsPigType());
 			
 			// And pull the results from the leaf.
 			try {
@@ -146,19 +147,31 @@ public class TriMapFunc extends StormBaseFunction {
 
 		mapPlanExecutor = new PlanExecutor(physicalPlan, mapKeyType, activeRoot);
 		
-		// See if this plan requires a negative pipeline.
+		PhysicalPlan negClone;
+		MultiMap<PhysicalOperator, PhysicalOperator> opmap;
+		// See if this plan requires a modified negative pipeline.
 		if (isCombined) {
 			CombineInverter ci = new CombineInverter(physicalPlan);
 			try {
-				PhysicalPlan ciClone = ci.getInverse();
-				// track activeRoot through the clone.
-				PhysicalOperator ciActiveRoot = ci.getLastOpMap().get(activeRoot).get(0);
-				
-				negMapPlanExecutor  = new PlanExecutor(ciClone, mapKeyType, ciActiveRoot);
+				negClone = ci.getInverse();
+				opmap = ci.getLastOpMap();
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}			
+		} else {
+			// Otherwise, create the negativePipeline anyway because of a-sync operators.
+			opmap = new MultiMap<PhysicalOperator, PhysicalOperator>();			
+			physicalPlan.setOpMap(opmap);
+			try {
+				negClone = physicalPlan.clone();
+			} catch (CloneNotSupportedException e) {
+				throw new RuntimeException(e);
+			}
+			physicalPlan.resetOpMap();
 		}
+		// track activeRoot through the clone.
+		PhysicalOperator negActiveRoot = opmap.get(activeRoot).get(0);
+		negMapPlanExecutor  = new PlanExecutor(negClone, mapKeyType, negActiveRoot);
 	}
 	
 	@Override
@@ -168,11 +181,34 @@ public class TriMapFunc extends StormBaseFunction {
 		// Determine if the tuple is positive or negative
 		Integer tive = tuple.getInteger(2);
 		
-		if (negMapPlanExecutor != null && tive < 0) {
+		if (tive < 0) {
 			negMapPlanExecutor.execute(tuple, collector, tive);
 		} else {
 			mapPlanExecutor.execute(tuple, collector, tive);
 		}
 	}
 
+	static public class MakeKeyRawValue extends BaseFunction {
+		@Override
+		public void execute(TridentTuple tuple, TridentCollector collector) {
+			// Re-wrap the object with a new PigNullableWritable.
+			
+			PigNullableWritable t = (PigNullableWritable) tuple.get(0);
+			Object o = t.getValueAsPigType();
+			
+			try {
+				PigNullableWritable raw = HDataType.getWritableComparableTypes(o, HDataType.findTypeFromNullableWritable(t));
+				collector.emit(new Values(raw));
+			} catch (ExecException e) {
+				throw new RuntimeException(e);
+			}
+		}		
+	}
+	
+	static public class Copy extends BaseFunction {
+		@Override
+		public void execute(TridentTuple tuple, TridentCollector collector) {
+			collector.emit(new ArrayList<Object>(tuple.getValues()));
+		}		
+	}
 }

@@ -150,6 +150,7 @@ public class TestStream extends TestCase {
     	pig.registerQuery("z = UNION x,y;");
     	pig.registerQuery("r = UNION q,z;");
 
+    	pig.registerQuery("STORE r INTO 'fake/pathr';");
 //    	explain("r");
     }
     
@@ -175,10 +176,12 @@ public class TestStream extends TestCase {
     	pig.registerQuery("words = JOIN x BY word, stoplist BY stopword;");
 //    	explain("words");
 
+//    	pig.registerQuery("x = FILTER x BY $0 == 'the';");
+//    	pig.registerQuery("y = FILTER y BY $0 == 'the';");
     	pig.registerQuery("silly = JOIN x BY word, y BY word;");
 //    	pig.registerQuery("STORE x INTO 'fake_path';");
-    	explain("silly");    	
-    	pig.registerQuery("STORE silly INTO 'fake_path';");
+//    	explain("silly");    	
+//    	pig.registerQuery("STORE silly INTO 'fake_path';");
     }
     
     @Test
@@ -200,9 +203,10 @@ public class TestStream extends TestCase {
     	pig.registerQuery("count_gr = GROUP x BY word;");
     	pig.registerQuery("count = FOREACH count_gr GENERATE group AS word, COUNT(x) AS wc;");
     	
-//    	props.setProperty("hist_gr_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 4, \"expiration\": 300, \"serializer\":\"org.apache.pig.impl.storm.state.PigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
+    	props.setProperty("hist_gr_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 4, \"expiration\": 300, \"serializer\":\"org.apache.pig.impl.storm.state.PigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
     	pig.registerQuery("hist_gr = GROUP count BY wc;");
     	pig.registerQuery("hist = FOREACH hist_gr GENERATE group AS wc, COUNT(count) AS freq;");
+    	pig.registerQuery("hist = FILTER hist BY freq > 0;");
     	
     	pig.registerQuery("q = GROUP x BY 1;");
     	pig.registerQuery("c = FOREACH q GENERATE COUNT(x);");

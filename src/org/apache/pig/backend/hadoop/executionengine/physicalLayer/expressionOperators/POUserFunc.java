@@ -478,7 +478,6 @@ public class POUserFunc extends ExpressionOperator {
     public String getInitialNeg() throws ExecException {
         instantiateFunc(origFSpec);
         if (func instanceof AlgebraicInverse) {
-        	System.err.println("POUserFunc.getInitialNeg: STUB");
             return ((AlgebraicInverse) func).getInitialInverse();
         } else {
             int errCode = 2072;

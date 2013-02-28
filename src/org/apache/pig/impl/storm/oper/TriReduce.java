@@ -13,6 +13,7 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.Reducer.Context;
 import org.apache.pig.PigException;
 import org.apache.pig.backend.executionengine.ExecException;
+import org.apache.pig.backend.hadoop.HDataType;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.POStatus;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.PhysicalOperator;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.Result;
@@ -20,6 +21,7 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.Physica
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POJoinPackage;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POPackage;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
+import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.io.PigNullableWritable;
@@ -128,7 +130,12 @@ public class TriReduce extends StormBaseFunction {
 				int count = ent.getValue().get();
 //				System.err.println("Pos: " + ent);
 				for (int i = 0; i < count ; i++) {
-					collector.emit(new Values(null, ent.getKey(), POS));
+					byte t = DataType.findType(ent.getKey());
+					try {
+						collector.emit(new Values(null, HDataType.getWritableComparableTypes(ent.getKey(), t), POS));
+					} catch (ExecException e) {
+						throw new RuntimeException(e);
+					}
 				}
 			}
 			
@@ -137,7 +144,12 @@ public class TriReduce extends StormBaseFunction {
 				int count = ent.getValue().get();
 //				System.err.println("Neg: " + ent);
 				for (int i = 0; i < count ; i++) {
-					collector.emit(new Values(null, ent.getKey(), NEG));
+					byte t = DataType.findType(ent.getKey());
+					try {
+						collector.emit(new Values(null, HDataType.getWritableComparableTypes(ent.getKey(), t), NEG));
+					} catch (ExecException e) {
+						throw new RuntimeException(e);
+					}
 				}
 			}
 		}
@@ -157,11 +169,15 @@ public class TriReduce extends StormBaseFunction {
 		if (tuples != null) {
 			runReduce(key, tuples, fc);
 		}
+		
+//		System.out.println("TriReduce |last_input|: " + ((tuples == null) ? 0 : tuples.size()) + " |last_output| : " + fc.last_res.size());
 
 		// Calculate the current values.
 		tuples = CombineWrapper.getTuples(m, CombineWrapper.CUR);
 		fc.switchToCur();
 		runReduce(key, tuples, fc);
+		
+//		System.out.println("TriReduce |cur_input|: " + tuples.size() + " |cur_output| : " + fc.cur_res.size());
 
 		// Emit positive and negative values.
 		fc.emitValues();

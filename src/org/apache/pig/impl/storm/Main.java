@@ -84,7 +84,8 @@ public class Main {
 			// Cycle through the inputs and create a clone map for each.
 			// This handles the cases for multiple inputs without breaking the plan apart.
 			for (PhysicalOperator po : sop.getPlan().getRoots()) {
-				StormOper input_sop = splan.getPLSpoutLink((POLoad) po);
+				StormOper input_sop = splan.getInputSOP((POLoad) po);
+//				splan.getPLSpoutLink((POLoad) po);
 				Stream input = sop_streams.get(input_sop);
 				
 				MultiMap<PhysicalOperator, PhysicalOperator> opmap = new MultiMap<PhysicalOperator, PhysicalOperator>();
@@ -95,8 +96,9 @@ public class Main {
 				}
 				PhysicalOperator cloneActiveRoot = opmap.get(po).get(0);
 				
+//				System.out.println("processMapSOP -- input: " + input + " " + input_sop + " " + po);
 				output = input.each(
-							input.getOutputFields(), 
+							input.getOutputFields(),
 							new TriMapFunc(clonePlan, sop.mapKeyType, sop.getIsCombined(), cloneActiveRoot),
 							output_fields
 						).project(output_fields);
@@ -157,33 +159,46 @@ public class Main {
 					throw new RuntimeException(e);
 				}
 			} else if (sop.getType() == StormOper.OpType.BASIC_PERSIST || sop.getType() == StormOper.OpType.COMBINE_PERSIST) {
-				// Group stuff.
+				// We need to encode the key into a value (sans index) to group properly.
+				Fields orig_input_fields = input.getOutputFields();
+				Fields group_key = new Fields(input.getOutputFields().get(0) + "_raw");
+				input = input.each(
+							new Fields(input.getOutputFields().get(0)),
+							new TriMapFunc.MakeKeyRawValue(),
+							group_key
+						);
+				
+				// Setup the aggregator.
+				CombineWrapper agg = null;
 				if (sop.getType() == StormOper.OpType.BASIC_PERSIST) {
-					output = input.groupBy(new Fields(input.getOutputFields().get(0)))
-							.persistentAggregate(
-								sop.getStateFactory(pc),
-								input.getOutputFields(),
-								new CombineWrapper(new TriBasicPersist()), 
-								output_fields
-							).newValuesStream();
+					agg = new CombineWrapper(new TriBasicPersist());
 				} else {					
 					// We need to trim things from the plan re:PigCombiner.java
 					POPackage pack = (POPackage) sop.getPlan().getRoots().get(0);
 					sop.getPlan().remove(pack);
 					
-					// Group
-					GroupedStream gr_output = input.groupBy(new Fields(input.getOutputFields().get(0)));
-					
-					// Aggregate
-					output = gr_output
-							.persistentAggregate(
-								sop.getStateFactory(pc),
-								gr_output.getOutputFields(),
-								new CombineWrapper(new TriCombinePersist(pack, sop.getPlan(), sop.mapKeyType)), 
-								new Fields(output_fields.get(0))
-							).newValuesStream()
-							.project(new Fields(input.getOutputFields().get(0), output_fields.get(0)));
+					agg = new CombineWrapper(new TriCombinePersist(pack, sop.getPlan(), sop.mapKeyType)); 
 				}
+				
+				// Group and aggregate
+				output = input.groupBy(group_key)
+						.persistentAggregate(
+							sop.getStateFactory(pc),
+							orig_input_fields,
+							agg, 
+							output_fields
+						).newValuesStream();
+				
+				// Re-alias the raw as the key.
+				output = output.each(
+							group_key,
+							new TriMapFunc.Copy(),
+							new Fields(orig_input_fields.get(0))
+						);
+
+				// Strip down to the appropriate values
+				output = output.project(new Fields(orig_input_fields.get(0), output_fields.get(0)));
+//				output.each(output.getOutputFields(), new Debug());
 			} else if (sop.getType() == StormOper.OpType.REDUCE_DELTA) {
 				// Need to reduce
 				output = input.each(

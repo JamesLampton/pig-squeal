@@ -28,7 +28,7 @@ public class TriBasicPersist implements CombinerAggregator<MapWritable> {
 				ret.add(v);
 			}
 		}
-				
+		
 		return ret;
 	}
 

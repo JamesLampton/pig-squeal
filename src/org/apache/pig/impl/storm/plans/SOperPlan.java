@@ -16,6 +16,7 @@ public class SOperPlan extends OperatorPlan<StormOper> {
 	
 	public Set<String> UDFs = new HashSet<String>();
 	public Map<POLoad, StormOper> PLSpoutLink = new HashMap<POLoad, StormOper>();
+	private Map<String, StormOper> rootMap;
 	
 	/* (non-Javadoc)
      * @see java.lang.Object#toString()
@@ -42,5 +43,17 @@ public class SOperPlan extends OperatorPlan<StormOper> {
 	
 	public StormOper getPLSpoutLink(POLoad pl) {
 		return PLSpoutLink.get(pl);
+	}
+
+	public void setRootMap(Map<String, StormOper> rootMap) {
+		this.rootMap = rootMap;
+	}
+	
+	public StormOper getInputSOP(POLoad pl) {
+		if (PLSpoutLink.get(pl) != null) {
+			return PLSpoutLink.get(pl);
+		} else {
+			return rootMap.get(pl.getLFile().getFileName());
+		}
 	}
 }
