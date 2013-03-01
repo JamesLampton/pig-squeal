@@ -42,6 +42,7 @@ import junit.framework.TestCase;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
@@ -89,6 +90,7 @@ public class TestStream extends TestCase {
 	private Properties props;
     static boolean runMiniCluster = false;
 	
+    
     @Override
     @Before
     public void setUp() throws Exception {
@@ -150,12 +152,23 @@ public class TestStream extends TestCase {
     	pig.registerQuery("z = UNION x,y;");
     	pig.registerQuery("r = UNION q,z;");
 
-    	pig.registerQuery("STORE r INTO 'fake/pathr';");
+//    	pig.registerQuery("STORE r INTO 'fake/pathr';");
 //    	explain("r");
     }
     
     @Test
     public void testJoin() throws Exception {
+    	// Create the input file ourselves.
+    	File stopfile = new File(STOPWORDS_FILE);
+//    	System.out.println("f:" + stopfile.getAbsolutePath());
+    	FileWriter fh = new FileWriter(stopfile);
+    	for (String w : STOPWORDS) {
+//    		System.out.println("w:" + w);
+    		fh.write(w);
+    		fh.write("\n");
+    	}
+    	fh.close();
+    	
     	pig.registerQuery("x = LOAD '/dev/null/0' USING " +
     			"org.apache.pig.impl.storm.SpoutWrapper(" +
     				"'org.apache.pig.test.storm.TestSentenceSpout') AS (sentence:chararray);");
@@ -172,8 +185,10 @@ public class TestStream extends TestCase {
 
     	pig.registerQuery("wordsr = JOIN x BY word, stoplist BY stopword USING 'replicated';");
 //    	explain("wordsr");
+    	pig.registerQuery("STORE wordsr INTO 'fake_path';");
     	
     	pig.registerQuery("words = JOIN x BY word, stoplist BY stopword;");
+//    	pig.registerQuery("STORE words INTO 'fake_path';");
 //    	explain("words");
 
 //    	pig.registerQuery("x = FILTER x BY $0 == 'the';");
@@ -182,6 +197,8 @@ public class TestStream extends TestCase {
 //    	pig.registerQuery("STORE x INTO 'fake_path';");
 //    	explain("silly");    	
 //    	pig.registerQuery("STORE silly INTO 'fake_path';");
+    	
+    	stopfile.delete();
     }
     
     @Test

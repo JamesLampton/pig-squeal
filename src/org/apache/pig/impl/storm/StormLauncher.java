@@ -37,6 +37,22 @@ public class StormLauncher extends Launcher {
 	
     private static final Log log = LogFactory.getLog(StormLauncher.class);
 
+    // Yes, this is evil.
+    class NullCompileMapReduceLauncher extends MapReduceLauncher {
+    	private MROperPlan preCompiledPlan;
+
+		public NullCompileMapReduceLauncher(MROperPlan preCompiledPlan) {
+    		this.preCompiledPlan = preCompiledPlan;
+    	}
+    	
+		@Override
+		public MROperPlan compile(
+	            PhysicalPlan php,
+	            PigContext pc) throws PlanException, IOException, VisitorException {
+			return preCompiledPlan;
+		}
+    }
+    
 	@Override
 	public PigStats launchPig(PhysicalPlan php, String grpName, PigContext pc)
 			throws PlanException, VisitorException, IOException, ExecException,
@@ -46,8 +62,20 @@ public class StormLauncher extends Launcher {
 
 		// Now compile the plan into a Storm plan.
 		SOperPlan sp = compile(php, pc);
+		
+		// If there is a replicated join build portion, execute it now.
+		if (sp.getReplPlan() != null) {
+			log.info("Launching Hadoop jobs to build replicated join input...");
+			NullCompileMapReduceLauncher mrlauncher = new NullCompileMapReduceLauncher(sp.getReplPlan());
+			PigStats ps = mrlauncher.launchPig(php, grpName, pc);
+			if (ps.getReturnCode() != ReturnCode.SUCCESS) {
+				log.warn("Ran into issues building the replicated join files, aborting.");
+				return ps;
+			}
+		}
 
 		// Encode the plan into the context for later retrieval.
+		log.info("Stashing the Storm plan into PigContext for retrieval by the topology runner...");
 		pc.getProperties().setProperty(PLANKEY, ObjectSerializer.serialize(sp));
 		
 		// Build the jar file.
@@ -75,8 +103,10 @@ public class StormLauncher extends Launcher {
 		
 		// Launch the storm task.
 		try {
+			log.info("Setting up the topology runner...");
 			Main m = new Main(pc, sp);
 			// TODO
+			log.info("Launching!");
 			m.launch();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -97,6 +127,7 @@ public class StormLauncher extends Launcher {
 		log.trace("Entering StormLauncher.explain");
 		
 		// TODO: Put this back.
+		ps.println();
 //		MapReduceLauncher mrlauncher = new MapReduceLauncher();
 //		try {
 //			mrlauncher.explain(pp.clone(), pc, ps, format, verbose);
@@ -107,9 +138,22 @@ public class StormLauncher extends Launcher {
 		// Now compile the plan into a Storm plan and explain.
 		SOperPlan sp = compile(pp, pc);
 
+
+		
         if (format.equals("text")) {
-            SPrinter printer = new SPrinter(ps, sp, pc);
+    		if (sp.getReplPlan() != null) {
+    			ps.println("#--------------------------------------------------");
+                ps.println("# Storm Plan -- Replicated Join MR Portion         ");
+                ps.println("#--------------------------------------------------");
+                
+                MRPrinter mrprinter = new MRPrinter(ps, sp.getReplPlan());
+                mrprinter.setVerbose(verbose);
+                mrprinter.visit();
+    		}
+
+    		SPrinter printer = new SPrinter(ps, sp, pc);
             printer.setVerbose(verbose);
+            
             printer.visit();
         } else {
             ps.println("#--------------------------------------------------");

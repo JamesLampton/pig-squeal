@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 
 
+import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.MROperPlan;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.impl.plan.OperatorPlan;
 import org.apache.pig.impl.plan.VisitorException;
@@ -17,6 +18,7 @@ public class SOperPlan extends OperatorPlan<StormOper> {
 	public Set<String> UDFs = new HashSet<String>();
 	public Map<POLoad, StormOper> PLSpoutLink = new HashMap<POLoad, StormOper>();
 	private Map<String, StormOper> rootMap;
+	private MROperPlan replPlan;
 	
 	/* (non-Javadoc)
      * @see java.lang.Object#toString()
@@ -55,5 +57,13 @@ public class SOperPlan extends OperatorPlan<StormOper> {
 		} else {
 			return rootMap.get(pl.getLFile().getFileName());
 		}
+	}
+
+	public void setReplPlan(MROperPlan replPlan) {
+		this.replPlan = replPlan;
+	}
+
+	public MROperPlan getReplPlan() {
+		return replPlan;
 	}
 }

@@ -22,8 +22,8 @@ public class SPrinter extends SOpPlanVisitor {
         this.pc = pc;
 		mStream = ps;
         mStream.println("#--------------------------------------------------");
-        mStream.println("# Storm Plan                                       ");
-        mStream.println("#--------------------------------------------------");	
+        mStream.println("# Storm Topology Plan                              ");
+        mStream.println("#--------------------------------------------------");
 	}
 
     public void setVerbose(boolean verbose) {
@@ -40,7 +40,7 @@ public class SPrinter extends SOpPlanVisitor {
           PlanPrinter<PhysicalOperator, PhysicalPlan> printer = new PlanPrinter<PhysicalOperator, PhysicalPlan>(sop.plan, mStream);
           printer.setVerbose(isVerbose);
           printer.visit();
-          mStream.println("--------");        	
+          mStream.println("\n--------");        	
         }
         mStream.println("----------------");
         mStream.println("");

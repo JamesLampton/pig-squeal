@@ -2,22 +2,29 @@ package org.apache.pig.impl.storm.plans;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.MapReduceOper;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.PhyPlanSetter;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.MROpPlanVisitor;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.MROperPlan;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.PhysicalOperator;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhyPlanVisitor;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhysicalPlan;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POFRJoin;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLocalRearrange;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
+import org.apache.pig.impl.io.FileSpec;
+import org.apache.pig.impl.plan.DependencyOrderWalker;
 import org.apache.pig.impl.plan.DepthFirstWalker;
 import org.apache.pig.impl.plan.NodeIdGenerator;
 import org.apache.pig.impl.plan.OperatorKey;
 import org.apache.pig.impl.plan.PlanException;
+import org.apache.pig.impl.plan.PlanWalker;
 import org.apache.pig.impl.plan.VisitorException;
 import org.apache.pig.impl.storm.SpoutWrapper;
 
@@ -30,10 +37,11 @@ public class MRtoSConverter extends MROpPlanVisitor {
 	private Map<String, StormOper> rootMap = new HashMap<String, StormOper>();;
 	private Map<String, List<StormOper>> missingRoots = new HashMap<String, List<StormOper>>();
 	NodeIdGenerator nig = NodeIdGenerator.getGenerator();
-	private String scope;;
+	private String scope;
+	private Set<FileSpec> replFiles = new HashSet<FileSpec>();
 	
 	public MRtoSConverter(MROperPlan plan) {
-		super(plan, new DepthFirstWalker<MapReduceOper, MROperPlan>(plan));
+		super(plan, new DependencyOrderWalker<MapReduceOper, MROperPlan>(plan));
 		this.plan = plan;
 		this.splan = new SOperPlan();
 		scope = plan.getRoots().get(0).getOperatorKey().getScope();
@@ -76,12 +84,33 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		return (leaf == null) ? null : leaf.getAlias();
 	}
 	
+	class FRJoinFinder extends PhyPlanVisitor {
+
+		private Set<FileSpec> replFiles;
+
+		public FRJoinFinder(PhysicalPlan plan, Set<FileSpec> replFiles) {
+			super(plan, new DependencyOrderWalker<PhysicalOperator, PhysicalPlan>(plan));
+			this.replFiles = replFiles;
+		}
+		
+	    @Override
+	    public void visitFRJoin(POFRJoin join) throws VisitorException {
+	    	// Extract the files.
+	    	for (FileSpec f : join.getReplFiles()) {
+	    		replFiles.add(f);
+	    	}
+	    }
+	}
+	
 	public void visitMROp(MapReduceOper mr) throws VisitorException {
 		splan.UDFs.addAll(mr.UDFs);
 		
 		new PhyPlanSetter(mr.mapPlan).visit();
         new PhyPlanSetter(mr.reducePlan).visit();
-		
+        
+        new FRJoinFinder(mr.mapPlan, replFiles).visit();
+        new FRJoinFinder(mr.reducePlan, replFiles).visit();        
+        
 		// Map SOP -- Attach to Spout or to Reduce SOP -- replace LOADs
 		// Optional Spout Point (May hook onto the end of a Reduce SOP)
 		StormOper mo = getSOp(StormOper.OpType.MAP, getAlias(mr.mapPlan, false));
@@ -175,14 +204,39 @@ public class MRtoSConverter extends MROpPlanVisitor {
 	public void convert() {
 		// Start walking.
 		try {
+			// Pull out the replicated join creation plan.
+			ReplJoinFixer rjf = new ReplJoinFixer(plan);
+			rjf.convert();
+			if (rjf.getReplPlan().size() > 0) {
+				splan.setReplPlan(rjf.getReplPlan());
+			}
+			
 			visit();
 			splan.setRootMap(rootMap);
+			
+			if (missingRoots.size() > 0) {
+				// We have some paths that aren't attached to the plan.
+				// Let's look for FRJoins and send the jobs to the MapReduce cluster for resolution.
+				System.out.println("Missing roots: " + missingRoots);
+				System.out.println("replFiles: " + replFiles);
+				fixFRJoins();
+			}
 		} catch (VisitorException e) {
 			e.printStackTrace();
 		}
 //		System.out.println("here");
 	}
 	
+	private void fixFRJoins() {
+		// Let's assume that the outstanding missing roots are caused by FRJoin calculations.
+		
+		// Walk from the missing roots to the leaves, re-creating the MapReduce jobs.
+		// FIXME: Identify and remove these before conversion?
+		
+		// TODO Auto-generated method stub
+		
+	}
+
 	public SOperPlan getSPlan() {
 		return splan;
 	}
