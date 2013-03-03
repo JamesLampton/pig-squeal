@@ -18,6 +18,7 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOpe
 import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.data.TupleFactory;
+import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.io.PigNullableWritable;
 import org.apache.pig.impl.plan.PlanException;
@@ -129,7 +130,8 @@ public class TriMapFunc extends StormBaseFunction {
 		}
 	}
 
-	public TriMapFunc(PhysicalPlan physicalPlan, byte mapKeyType, boolean isCombined, PhysicalOperator activeRoot) {
+	public TriMapFunc(PigContext pc, PhysicalPlan physicalPlan, byte mapKeyType, boolean isCombined, PhysicalOperator activeRoot) {
+		super(pc);
 		// Pull out the active root and get the predecessor.
 		List<PhysicalOperator> roots = physicalPlan.getSuccessors(activeRoot);
 		if (roots.size() > 1) {

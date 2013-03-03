@@ -23,6 +23,7 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOpe
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
 import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
+import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.io.PigNullableWritable;
 
@@ -44,7 +45,9 @@ public class TriReduce extends StormBaseFunction {
 	private final static Integer POS = 1;
 	private final static Integer NEG = -1;
 	
-	public TriReduce(PhysicalPlan plan) {
+	public TriReduce(PigContext pc, PhysicalPlan plan) {
+		super(pc);
+		
 		// We need to trim things from the plan re:GenericMapReduce.java
 		reducePlan = plan;
 		pack = (POPackage) plan.getRoots().get(0);
