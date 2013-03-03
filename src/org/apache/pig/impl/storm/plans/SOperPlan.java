@@ -5,12 +5,16 @@ import java.io.PrintStream;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
 
+import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.MapReduceOper;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.MROperPlan;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
+import org.apache.pig.impl.io.FileSpec;
 import org.apache.pig.impl.plan.OperatorPlan;
+import org.apache.pig.impl.plan.PlanWalker;
 import org.apache.pig.impl.plan.VisitorException;
 
 public class SOperPlan extends OperatorPlan<StormOper> {
@@ -19,6 +23,8 @@ public class SOperPlan extends OperatorPlan<StormOper> {
 	public Map<POLoad, StormOper> PLSpoutLink = new HashMap<POLoad, StormOper>();
 	private Map<String, StormOper> rootMap;
 	private MROperPlan replPlan;
+	public Set<FileSpec> replFiles = new HashSet<FileSpec>();
+	private Map<FileSpec, FileSpec> rFileMap;
 	
 	/* (non-Javadoc)
      * @see java.lang.Object#toString()
@@ -65,5 +71,13 @@ public class SOperPlan extends OperatorPlan<StormOper> {
 
 	public MROperPlan getReplPlan() {
 		return replPlan;
+	}
+
+	public void setReplFileMap(Map<FileSpec, FileSpec> replFileMap) {
+		this.rFileMap = replFileMap;
+	}
+	
+	public Map<FileSpec, FileSpec> getReplFileMap() {
+		return rFileMap;
 	}
 }

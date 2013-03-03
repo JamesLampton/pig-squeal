@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
+import java.util.Map.Entry;
 import java.util.jar.JarOutputStream;
 import java.util.zip.ZipEntry;
 
@@ -13,6 +14,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.pig.ExecType;
 import org.apache.pig.PigRunner.ReturnCode;
+import org.apache.pig.backend.datastorage.ContainerDescriptor;
+import org.apache.pig.backend.datastorage.DataStorage;
+import org.apache.pig.backend.datastorage.ElementDescriptor;
 import org.apache.pig.backend.executionengine.ExecException;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.JobCreationException;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.Launcher;
@@ -22,6 +26,8 @@ import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.MROper
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.MRPrinter;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhysicalPlan;
 import org.apache.pig.impl.PigContext;
+import org.apache.pig.impl.io.FileLocalizer;
+import org.apache.pig.impl.io.FileSpec;
 import org.apache.pig.impl.plan.PlanException;
 import org.apache.pig.impl.plan.VisitorException;
 import org.apache.pig.impl.storm.plans.MRtoSConverter;
@@ -38,10 +44,10 @@ public class StormLauncher extends Launcher {
     private static final Log log = LogFactory.getLog(StormLauncher.class);
 
     // Yes, this is evil.
-    class NullCompileMapReduceLauncher extends MapReduceLauncher {
+    class NoCompileMapReduceLauncher extends MapReduceLauncher {
     	private MROperPlan preCompiledPlan;
 
-		public NullCompileMapReduceLauncher(MROperPlan preCompiledPlan) {
+		public NoCompileMapReduceLauncher(MROperPlan preCompiledPlan) {
     		this.preCompiledPlan = preCompiledPlan;
     	}
     	
@@ -66,11 +72,21 @@ public class StormLauncher extends Launcher {
 		// If there is a replicated join build portion, execute it now.
 		if (sp.getReplPlan() != null) {
 			log.info("Launching Hadoop jobs to build replicated join input...");
-			NullCompileMapReduceLauncher mrlauncher = new NullCompileMapReduceLauncher(sp.getReplPlan());
+			NoCompileMapReduceLauncher mrlauncher = new NoCompileMapReduceLauncher(sp.getReplPlan());
 			PigStats ps = mrlauncher.launchPig(php, grpName, pc);
 			if (ps.getReturnCode() != ReturnCode.SUCCESS) {
 				log.warn("Ran into issues building the replicated join files, aborting.");
 				return ps;
+			}
+			
+			// The temp files will be deleted by Pig's Main.  The topology will live on
+			// beyond this window, so we will move all the temp files to a new location.
+			DataStorage dfs = pc.getDfs();
+			for (Entry<FileSpec, FileSpec> ent : sp.getReplFileMap().entrySet()) {
+				log.info("Moving " + ent.getKey() + " to " + ent.getValue());
+				ElementDescriptor fn_from = dfs.asElement(ent.getKey().getFileName());
+				ElementDescriptor fn_to = dfs.asElement(ent.getValue().getFileName());
+				fn_from.rename(fn_to);
 			}
 		}
 
@@ -103,9 +119,13 @@ public class StormLauncher extends Launcher {
 		
 		// Launch the storm task.
 		try {
+			// TODO: Execute "storm jar blah.jar";
+			
+			
+			
+			// For testing purposes.
 			log.info("Setting up the topology runner...");
 			Main m = new Main(pc, sp);
-			// TODO
 			log.info("Launching!");
 //			m.launch();
 		} catch (Exception e) {
@@ -126,20 +146,11 @@ public class StormLauncher extends Launcher {
 		
 		log.trace("Entering StormLauncher.explain");
 		
-		// TODO: Put this back.
 		ps.println();
-//		MapReduceLauncher mrlauncher = new MapReduceLauncher();
-//		try {
-//			mrlauncher.explain(pp.clone(), pc, ps, format, verbose);
-//		} catch (CloneNotSupportedException e) {
-//			e.printStackTrace();
-//		}
 		
 		// Now compile the plan into a Storm plan and explain.
 		SOperPlan sp = compile(pp, pc);
-
-
-		
+	
         if (format.equals("text")) {
     		if (sp.getReplPlan() != null) {
     			ps.println("#--------------------------------------------------");

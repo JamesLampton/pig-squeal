@@ -1,12 +1,15 @@
 package org.apache.pig.impl.storm.plans;
 
+import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.MapReduceOper;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.PhyPlanSetter;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.MROpPlanVisitor;
@@ -42,13 +45,8 @@ public class ReplJoinFixer extends MROpPlanVisitor {
 
 	private MROperPlan plan;
 	private MROperPlan replPlan = new MROperPlan();
-	
-	public MROperPlan getReplPlan() {
-		return replPlan;
-	}
-	
 	Map<String, MapReduceOper> fnToMOP = new HashMap<String, MapReduceOper>();
-	Set<FileSpec> rFiles = new HashSet<FileSpec>();
+	Map<FileSpec, FileSpec> rFileMap = new HashMap<FileSpec, FileSpec>();
 
 //	private Set<FileSpec> replFiles = new HashSet<FileSpec>();
 	
@@ -58,22 +56,37 @@ public class ReplJoinFixer extends MROpPlanVisitor {
 	}
 	
 	class FRJoinFinder extends PhyPlanVisitor {
-		private Set<FileSpec> replFiles;
 
-		public FRJoinFinder(PhysicalPlan plan, Set<FileSpec> replFiles) {
+		public FRJoinFinder(PhysicalPlan plan) {
 			super(plan, new DependencyOrderWalker<PhysicalOperator, PhysicalPlan>(plan));
-			this.replFiles = replFiles;
 		}
 		
 	    @Override
 	    public void visitFRJoin(POFRJoin join) throws VisitorException {
+	    	List<FileSpec> newrepl = new ArrayList<FileSpec>();
+	    	
 	    	// Extract the files.
 	    	for (FileSpec f : join.getReplFiles()) {
-	    		if (f != null) {
-//	    			System.out.println("Join: " + join + " " + f);
-	    			replFiles.add(f);
+	    		if (f == null) {
+	    			newrepl.add(f);
+	    			continue;
 	    		}
+	    		
+	    		// The File/basename etc works for hadoop paths, so we're going to do it the sloppy way.
+	    		String[] parts = f.getFileName().split("/");
+	    		int parent_index = parts.length - 2;
+	    		parts[parent_index] += "-persist";
+	    		String newfn = StringUtils.join(parts, "/");
+	    		
+	    		FileSpec newspec = new FileSpec(newfn, f.getFuncSpec());
+	    		rFileMap.put(f, newspec);
+	    		newrepl.add(newspec);
+	    		
+//	    		System.out.println("Join: " + join + " " + f);
+//	    		replFiles.add(f);
 	    	}
+	    	
+	    	join.setReplFiles(newrepl.toArray(join.getReplFiles()));
 	    }
 	}
 	
@@ -91,8 +104,8 @@ public class ReplJoinFixer extends MROpPlanVisitor {
 		}
 
 		// Collect the replicated files, we'll sweep back along fnToMOP later.
-        new FRJoinFinder(mr.mapPlan, rFiles).visit();
-        new FRJoinFinder(mr.reducePlan, rFiles).visit();        
+        new FRJoinFinder(mr.mapPlan).visit();
+        new FRJoinFinder(mr.reducePlan).visit();        
 	}
 	
 	public void convert() {
@@ -107,7 +120,7 @@ public class ReplJoinFixer extends MROpPlanVisitor {
 
 	private void extractReplPlans() throws PlanException {
 //		System.out.println("rFiles: " + rFiles);
-		for (FileSpec f : rFiles) {
+		for (FileSpec f : rFileMap.keySet()) {
 			// Determine the leaf of the plan that produces this file
 			// and move the plan to replPlan.
 			moveToReplPlan(fnToMOP.get(f.getFileName()));
@@ -133,5 +146,13 @@ public class ReplJoinFixer extends MROpPlanVisitor {
 			// And link in the new plan.
 			replPlan.connect(pred, mr_cur);
 		}
+	}
+	
+	public MROperPlan getReplPlan() {
+		return replPlan;
+	}
+
+	public Map<FileSpec, FileSpec> getReplFileMap() {
+		return rFileMap;
 	}
 }

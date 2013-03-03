@@ -38,7 +38,6 @@ public class MRtoSConverter extends MROpPlanVisitor {
 	private Map<String, List<StormOper>> missingRoots = new HashMap<String, List<StormOper>>();
 	NodeIdGenerator nig = NodeIdGenerator.getGenerator();
 	private String scope;
-	private Set<FileSpec> replFiles = new HashSet<FileSpec>();
 	
 	public MRtoSConverter(MROperPlan plan) {
 		super(plan, new DependencyOrderWalker<MapReduceOper, MROperPlan>(plan));
@@ -108,8 +107,8 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		new PhyPlanSetter(mr.mapPlan).visit();
         new PhyPlanSetter(mr.reducePlan).visit();
         
-        new FRJoinFinder(mr.mapPlan, replFiles).visit();
-        new FRJoinFinder(mr.reducePlan, replFiles).visit();        
+        new FRJoinFinder(mr.mapPlan, splan.replFiles).visit();
+        new FRJoinFinder(mr.reducePlan, splan.replFiles).visit();        
         
 		// Map SOP -- Attach to Spout or to Reduce SOP -- replace LOADs
 		// Optional Spout Point (May hook onto the end of a Reduce SOP)
@@ -209,32 +208,21 @@ public class MRtoSConverter extends MROpPlanVisitor {
 			rjf.convert();
 			if (rjf.getReplPlan().size() > 0) {
 				splan.setReplPlan(rjf.getReplPlan());
+				splan.setReplFileMap(rjf.getReplFileMap());
 			}
 			
 			visit();
 			splan.setRootMap(rootMap);
 			
+//			System.out.println("ReplFiles: " + splan.replFiles);
 			if (missingRoots.size() > 0) {
 				// We have some paths that aren't attached to the plan.
-				// Let's look for FRJoins and send the jobs to the MapReduce cluster for resolution.
 				System.out.println("Missing roots: " + missingRoots);
-				System.out.println("replFiles: " + replFiles);
-				fixFRJoins();
 			}
 		} catch (VisitorException e) {
 			e.printStackTrace();
 		}
 //		System.out.println("here");
-	}
-	
-	private void fixFRJoins() {
-		// Let's assume that the outstanding missing roots are caused by FRJoin calculations.
-		
-		// Walk from the missing roots to the leaves, re-creating the MapReduce jobs.
-		// FIXME: Identify and remove these before conversion?
-		
-		// TODO Auto-generated method stub
-		
 	}
 
 	public SOperPlan getSPlan() {
