@@ -155,6 +155,7 @@ public class Main {
 			if (sop.getType() == StormOper.OpType.MAP) {
 				try {
 					output = processMapSOP(sop);
+//					output.each(output.getOutputFields(), new Debug());
 				} catch (CloneNotSupportedException e) {
 					throw new RuntimeException(e);
 				}

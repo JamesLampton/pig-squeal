@@ -90,25 +90,6 @@ public class COUNT extends EvalFunc<Long> implements Algebraic, Accumulator<Long
     public String getFinal() {
         return Final.class.getName();
     }
-    
-	static public class InitialInverse extends EvalFunc<Tuple> {
-
-        @Override
-        public Tuple exec(Tuple input) throws IOException {
-            // Since Initial is guaranteed to be called
-            // only in the map, it will be called with an
-            // input of a bag with a single tuple - the 
-            // count should always be -1 if bag is non empty
-            DataBag bag = (DataBag)input.get(0);
-            Iterator it = bag.iterator();
-            if (it.hasNext()){
-                Tuple t = (Tuple)it.next();
-                if (t != null && t.size() > 0 && t.get(0) != null)
-                    return mTupleFactory.newTuple(Long.valueOf(-1));
-            }
-            return mTupleFactory.newTuple(Long.valueOf(0));
-        }
-    }
 	
     static public class Initial extends EvalFunc<Tuple> implements AlgebraicInverse {
 
@@ -132,6 +113,15 @@ public class COUNT extends EvalFunc<Long> implements Algebraic, Accumulator<Long
     	public String getInitialInverse() {
     		return InitialInverse.class.getName();
     	}        
+    }
+    
+    static public class InitialInverse extends Initial {
+
+        @Override
+        public Tuple exec(Tuple input) throws IOException {
+        	Tuple res = super.exec(input);
+            return mTupleFactory.newTuple(-(Long)res.get(0));
+        }
     }
 
     static public class Intermediate extends EvalFunc<Tuple> {

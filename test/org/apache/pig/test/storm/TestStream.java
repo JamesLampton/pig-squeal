@@ -185,7 +185,7 @@ public class TestStream extends TestCase {
 
     	pig.registerQuery("wordsr = JOIN x BY word, stoplist BY stopword USING 'replicated';");
 //    	explain("wordsr");
-    	pig.registerQuery("STORE wordsr INTO 'fake_path';");
+//    	pig.registerQuery("STORE wordsr INTO 'fake_path';");
     	
     	pig.registerQuery("words = JOIN x BY word, stoplist BY stopword;");
 //    	pig.registerQuery("STORE words INTO 'fake_path';");
@@ -229,7 +229,7 @@ public class TestStream extends TestCase {
     	pig.registerQuery("c = FOREACH q GENERATE COUNT(x);");
 //    	pig.registerQuery("STORE c INTO '/dev/null/1';");
     	
-//    	pig.registerQuery("STORE hist INTO '/dev/null/1';");
+    	pig.registerQuery("STORE hist INTO '/dev/null/1';");
 //    	pig.registerQuery("STORE x INTO '/dev/null/1';");
 //    	pig.registerQuery("STORE count_gr INTO '/dev/null/1';");
 //    	pig.registerQuery("STORE count INTO '/dev/null/1';");
