@@ -17,11 +17,13 @@ import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.plan.DependencyOrderWalker;
 import org.apache.pig.impl.plan.VisitorException;
 import org.apache.pig.impl.storm.oper.CombineWrapper;
+import org.apache.pig.impl.storm.oper.ReduceWrapper;
 import org.apache.pig.impl.storm.oper.TriBasicPersist;
 import org.apache.pig.impl.storm.oper.TriCombinePersist;
 import org.apache.pig.impl.storm.oper.TriMakePigTuples;
 import org.apache.pig.impl.storm.oper.TriMapFunc;
 import org.apache.pig.impl.storm.oper.TriReduce;
+import org.apache.pig.impl.storm.oper.TriWindowPersist;
 import org.apache.pig.impl.storm.plans.SOpPlanVisitor;
 import org.apache.pig.impl.storm.plans.SOperPlan;
 import org.apache.pig.impl.storm.plans.StormOper;
@@ -112,7 +114,7 @@ public class Main {
 			}
 			
 			// Optional debug.
-			output.each(output.getOutputFields(), new Debug());
+//			output.each(output.getOutputFields(), new Debug());
 			
 			return output;
 		}
@@ -170,25 +172,38 @@ public class Main {
 						);
 				
 				// Setup the aggregator.
-				CombineWrapper agg = null;
-				if (sop.getType() == StormOper.OpType.BASIC_PERSIST) {
-					agg = new CombineWrapper(new TriBasicPersist());
-				} else {					
-					// We need to trim things from the plan re:PigCombiner.java
-					POPackage pack = (POPackage) sop.getPlan().getRoots().get(0);
-					sop.getPlan().remove(pack);
-					
-					agg = new CombineWrapper(new TriCombinePersist(pack, sop.getPlan(), sop.mapKeyType)); 
+				if (sop.getWindowOptions() == null) {
+					// Use the CombineWrapper.
+					CombineWrapper agg = null;
+					if (sop.getType() == StormOper.OpType.BASIC_PERSIST) {
+						agg = new CombineWrapper(new TriBasicPersist());
+					} else {					
+						// We need to trim things from the plan re:PigCombiner.java
+						POPackage pack = (POPackage) sop.getPlan().getRoots().get(0);
+						sop.getPlan().remove(pack);
+
+						agg = new CombineWrapper(new TriCombinePersist(pack, sop.getPlan(), sop.mapKeyType)); 
+					}
+
+					// Group and aggregate
+					output = input.groupBy(group_key)
+							.persistentAggregate(
+								sop.getStateFactory(pc),
+								orig_input_fields,
+								agg, 
+								output_fields
+							).newValuesStream();
+				} else {
+					// When windowing, we don't want to use any combiner logic.
+					// Group and aggregate
+					output = input.groupBy(group_key)
+							.persistentAggregate(
+								sop.getStateFactory(pc),
+								orig_input_fields,
+								new ReduceWrapper(new TriWindowPersist(sop.getWindowOptions()), true), 
+								output_fields
+							).newValuesStream();
 				}
-				
-				// Group and aggregate
-				output = input.groupBy(group_key)
-						.persistentAggregate(
-							sop.getStateFactory(pc),
-							orig_input_fields,
-							agg, 
-							output_fields
-						).newValuesStream();
 				
 				// Re-alias the raw as the key.
 				output = output.each(
@@ -204,7 +219,7 @@ public class Main {
 				// Need to reduce
 				output = input.each(
 							input.getOutputFields(), 
-							new TriReduce(pc, sop.getPlan()), 
+							new TriReduce(pc, sop.getPlan(), (sop.getWindowOptions() == null ? false : true)), 
 							output_fields
 						).project(output_fields);
 				output.each(output.getOutputFields(), new Debug());

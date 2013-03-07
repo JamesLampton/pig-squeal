@@ -44,7 +44,6 @@ public class CombineWrapper implements CombinerAggregator<MapWritable> {
 
 		// Assuming that val1 came from the cache/state.
 		if (val1.get(CUR) != null) {
-			// FIXME: Create a MapWritable generator that always has the appropriate classes?
 			ret.put(LAST, val1.get(CUR));
 		}
 		ret.put(CUR, agg.combine(getDefault(val1, CUR), getDefault(val2, CUR)));

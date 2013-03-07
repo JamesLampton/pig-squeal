@@ -18,6 +18,7 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOpe
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLocalRearrange;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
+import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.io.FileSpec;
 import org.apache.pig.impl.plan.DependencyOrderWalker;
 import org.apache.pig.impl.plan.DepthFirstWalker;
@@ -38,11 +39,13 @@ public class MRtoSConverter extends MROpPlanVisitor {
 	private Map<String, List<StormOper>> missingRoots = new HashMap<String, List<StormOper>>();
 	NodeIdGenerator nig = NodeIdGenerator.getGenerator();
 	private String scope;
+	private PigContext pc;
 	
-	public MRtoSConverter(MROperPlan plan) {
+	public MRtoSConverter(MROperPlan plan, PigContext pc) {
 		super(plan, new DependencyOrderWalker<MapReduceOper, MROperPlan>(plan));
 		this.plan = plan;
 		this.splan = new SOperPlan();
+		this.pc = pc;
 		scope = plan.getRoots().get(0).getOperatorKey().getScope();
 	}
 	
@@ -169,14 +172,18 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		
 		// Persist SOP
 		StormOper po;
-		if (mr.combinePlan.size() > 0) {
-			po = getSOp(StormOper.OpType.COMBINE_PERSIST, getAlias(mr.combinePlan, false));
+		// See if we're a window.
+		String red_alias = (mr.combinePlan.size() > 0) ? getAlias(mr.combinePlan, false) : getAlias(mr.reducePlan, true);
+		String window_opts = pc.getProperties().getProperty(red_alias + "_window_opts");
+		if (mr.combinePlan.size() == 0 || window_opts != null) {
+			// Basic reduce or windowed group operator.
+			po = getSOp(StormOper.OpType.BASIC_PERSIST, red_alias);
+			po.setWindowOptions(window_opts);
+		} else {
 			// Combine SOP
+			po = getSOp(StormOper.OpType.COMBINE_PERSIST, getAlias(mr.combinePlan, false));
 			po.setPlan(mr.combinePlan);
 			po.mapKeyType = mr.mapKeyType;
-		} else {
-			// Basic store SOP
-			po = getSOp(StormOper.OpType.BASIC_PERSIST, getAlias(mr.reducePlan, true));
 		}
 		splan.add(po);
 		try {
@@ -195,6 +202,8 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		}
 		// TODO -- Remove stores.
 		rdo.setPlan(mr.reducePlan);
+		// Set window options to tell TriReduce which getTuples routine to call.
+		rdo.setWindowOptions(window_opts);
 		
 //		System.err.println("Reduce leaves: " + mr.reducePlan.getLeaves());
 		setupStore(mr.reducePlan.getLeaves(), rdo);

@@ -127,7 +127,7 @@ public class StormLauncher extends Launcher {
 			log.info("Setting up the topology runner...");
 			Main m = new Main(pc, sp);
 			log.info("Launching!");
-//			m.launch();
+			m.launch();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -185,7 +185,7 @@ public class StormLauncher extends Launcher {
 		MapReduceLauncher mrlauncher = new MapReduceLauncher();
 		MROperPlan mrp = mrlauncher.compile(php, pc);
 		
-		MRtoSConverter converter = new MRtoSConverter(mrp);
+		MRtoSConverter converter = new MRtoSConverter(mrp, pc);
 		converter.convert();
 		
 		return converter.getSPlan();

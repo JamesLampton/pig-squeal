@@ -51,6 +51,7 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 
 	IRichSpout spout;
 	public boolean isCombined;
+	private String windowOpts;
 
 	public void setSpout(IRichSpout spout) {
 		this.spout = spout;
@@ -108,4 +109,11 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 		return isCombined;
 	}
 
+	public void setWindowOptions(String opts) {
+		windowOpts = opts;		
+	}
+
+	public String getWindowOptions() {
+		return windowOpts;
+	}
 }

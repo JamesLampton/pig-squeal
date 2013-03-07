@@ -35,6 +35,9 @@ public class SPrinter extends SOpPlanVisitor {
         mStream.println("Storm node " + sop.getOperatorKey().toString() + " type: " + sop.getType() + " alias: " + sop.name());
         if (sop.getType() == StormOper.OpType.BASIC_PERSIST || sop.getType() == StormOper.OpType.COMBINE_PERSIST) {
         	mStream.println("Backing Store: " + sop.getStateFactoryOpts(pc));
+        	if (sop.getWindowOptions() != null) {
+        		mStream.println("Window options: " + sop.getWindowOptions());
+        	}
         }
         if (sop.plan != null) {
           PlanPrinter<PhysicalOperator, PhysicalPlan> printer = new PlanPrinter<PhysicalOperator, PhysicalPlan>(sop.plan, mStream);

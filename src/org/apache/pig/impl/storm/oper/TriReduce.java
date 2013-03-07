@@ -40,13 +40,16 @@ public class TriReduce extends StormBaseFunction {
 	private PhysicalOperator leaf;
 	private POPackage pack;
 	private boolean errorInReduce;
+	private boolean windowedInput;
 	private final static Tuple DUMMYTUPLE = null;
 	private final static PhysicalOperator[] DUMMYROOTARR = {};
 	private final static Integer POS = 1;
 	private final static Integer NEG = -1;
 	
-	public TriReduce(PigContext pc, PhysicalPlan plan) {
+	public TriReduce(PigContext pc, PhysicalPlan plan, boolean windowedInput) {
 		super(pc);
+		
+		this.windowedInput = windowedInput;
 		
 		// We need to trim things from the plan re:GenericMapReduce.java
 		reducePlan = plan;
@@ -160,7 +163,7 @@ public class TriReduce extends StormBaseFunction {
 	
 	@Override
 	public void execute(TridentTuple tri_tuple, TridentCollector collector) {
-//		System.out.println("TriReduce input: " + tri_tuple);
+		System.out.println("TriReduce input: " + tri_tuple);
 		
 		PigNullableWritable key = (PigNullableWritable) tri_tuple.get(0);
 	
@@ -168,7 +171,12 @@ public class TriReduce extends StormBaseFunction {
 		FakeCollector fc = new FakeCollector(collector);
 
 		// Calculate the previous values.
-		List<NullableTuple> tuples = CombineWrapper.getTuples(m, CombineWrapper.LAST);
+		List<NullableTuple> tuples;
+		if (windowedInput) {
+			tuples = ReduceWrapper.getTuples(m, ReduceWrapper.LAST);
+		} else {
+			tuples = CombineWrapper.getTuples(m, CombineWrapper.LAST);
+		}
 		if (tuples != null) {
 			runReduce(key, tuples, fc);
 		}
@@ -176,7 +184,11 @@ public class TriReduce extends StormBaseFunction {
 //		System.out.println("TriReduce |last_input|: " + ((tuples == null) ? 0 : tuples.size()) + " |last_output| : " + fc.last_res.size());
 
 		// Calculate the current values.
-		tuples = CombineWrapper.getTuples(m, CombineWrapper.CUR);
+		if (windowedInput) {
+			tuples = ReduceWrapper.getTuples(m, ReduceWrapper.CUR);
+		} else {
+			tuples = CombineWrapper.getTuples(m, CombineWrapper.CUR);
+		}
 		fc.switchToCur();
 		runReduce(key, tuples, fc);
 		
