@@ -9,7 +9,7 @@ import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.plan.Operator;
 import org.apache.pig.impl.plan.OperatorKey;
 import org.apache.pig.impl.plan.VisitorException;
-import org.apache.pig.impl.storm.SpoutWrapper;
+import org.apache.pig.impl.storm.io.SpoutWrapper;
 import org.apache.pig.impl.storm.state.StateWrapper;
 
 import backtype.storm.topology.IRichSpout;

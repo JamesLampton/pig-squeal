@@ -27,7 +27,7 @@ import org.apache.pig.impl.plan.OperatorKey;
 import org.apache.pig.impl.plan.PlanException;
 import org.apache.pig.impl.plan.PlanWalker;
 import org.apache.pig.impl.plan.VisitorException;
-import org.apache.pig.impl.storm.SpoutWrapper;
+import org.apache.pig.impl.storm.io.SpoutWrapper;
 
 public class MRtoSConverter extends MROpPlanVisitor {
 
@@ -86,7 +86,7 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		return (leaf == null) ? null : leaf.getAlias();
 	}
 	
-	class FRJoinFinder extends PhyPlanVisitor {
+	private class FRJoinFinder extends PhyPlanVisitor {
 
 		private Set<FileSpec> replFiles;
 
@@ -212,13 +212,20 @@ public class MRtoSConverter extends MROpPlanVisitor {
 	public void convert() {
 		// Start walking.
 		try {
-			// Pull out the replicated join creation plan.
-			ReplJoinFixer rjf = new ReplJoinFixer(plan);
-			rjf.convert();
-			if (rjf.getReplPlan().size() > 0) {
-				splan.setReplPlan(rjf.getReplPlan());
-				splan.setReplFileMap(rjf.getReplFileMap());
+			// Pull out any static subtrees from the execution plan.
+			FixedLoadPathFixer flpf = new FixedLoadPathFixer(plan);
+			flpf.convert();
+			if (flpf.getStaticPlan().size() > 0) {
+				splan.setStaticPlan(flpf.getStaticPlan());
 			}
+			
+			// Pull out the replicated join creation plan.
+//			ReplJoinFixer rjf = new ReplJoinFixer(plan);
+//			rjf.convert();
+//			if (rjf.getReplPlan().size() > 0) {
+//				splan.setReplPlan(rjf.getReplPlan());
+//				splan.setReplFileMap(rjf.getReplFileMap());
+//			}
 			
 			visit();
 			splan.setRootMap(rootMap);

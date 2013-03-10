@@ -1,4 +1,4 @@
-package org.apache.pig.impl.storm;
+package org.apache.pig.impl.storm.io;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;

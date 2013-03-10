@@ -152,12 +152,12 @@ public class StormLauncher extends Launcher {
 		SOperPlan sp = compile(pp, pc);
 	
         if (format.equals("text")) {
-    		if (sp.getReplPlan() != null) {
+    		if (sp.getStaticPlan() != null) {
     			ps.println("#--------------------------------------------------");
-                ps.println("# Storm Plan -- Replicated Join MR Portion         ");
+                ps.println("# Storm Plan -- Static MR Portion                  ");
                 ps.println("#--------------------------------------------------");
                 
-                MRPrinter mrprinter = new MRPrinter(ps, sp.getReplPlan());
+                MRPrinter mrprinter = new MRPrinter(ps, sp.getStaticPlan());
                 mrprinter.setVerbose(verbose);
                 mrprinter.visit();
     		}

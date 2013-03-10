@@ -30,7 +30,7 @@ import org.apache.pig.impl.plan.PlanException;
 import org.apache.pig.impl.plan.PlanWalker;
 import org.apache.pig.impl.plan.ReverseDependencyOrderWalker;
 import org.apache.pig.impl.plan.VisitorException;
-import org.apache.pig.impl.storm.SpoutWrapper;
+import org.apache.pig.impl.storm.io.SpoutWrapper;
 
 /**
  * The purpose of this class is to find elements of a MapReduce plan that

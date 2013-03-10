@@ -103,6 +103,7 @@ public class TestStream extends TestCase {
         	pig = new PigServer(ExecType.STORM, cluster.getProperties());
     	} else {
         	pig = new PigServer("storm-local");
+//        	pig = new PigServer("local");
     	}
     	
     	props = pig.getPigContext().getProperties();    	
@@ -135,13 +136,13 @@ public class TestStream extends TestCase {
     @Test
     public void testUnion() throws Exception {
     	pig.registerQuery("x = LOAD '/dev/null/0' USING " +
-    			"org.apache.pig.impl.storm.SpoutWrapper(" +
+    			"org.apache.pig.impl.storm.io.SpoutWrapper(" +
     				"'org.apache.pig.test.storm.TestSentenceSpout') AS (sentence:chararray);");
     	pig.registerQuery("x = FOREACH x GENERATE FLATTEN(TOKENIZE(sentence));");
     	pig.registerQuery("x = FOREACH x GENERATE LOWER($0) AS word;");
 
     	pig.registerQuery("y = LOAD '/dev/null/1' USING " +
-    			"org.apache.pig.impl.storm.SpoutWrapper(" +
+    			"org.apache.pig.impl.storm.io.SpoutWrapper(" +
     				"'org.apache.pig.test.storm.TestSentenceSpout') AS (sentence:chararray);");
     	
     	pig.registerQuery("q = UNION x,y;");
@@ -170,26 +171,34 @@ public class TestStream extends TestCase {
     	fh.close();
     	
     	pig.registerQuery("x = LOAD '/dev/null/0' USING " +
-    			"org.apache.pig.impl.storm.SpoutWrapper(" +
+    			"org.apache.pig.impl.storm.io.SpoutWrapper(" +
     				"'org.apache.pig.test.storm.TestSentenceSpout') AS (sentence:chararray);");
     	pig.registerQuery("x = FOREACH x GENERATE FLATTEN(TOKENIZE(sentence));");
     	pig.registerQuery("x = FOREACH x GENERATE LOWER($0) AS word, 'x';");
 
     	pig.registerQuery("y = LOAD '/dev/null/1' USING " +
-    			"org.apache.pig.impl.storm.SpoutWrapper(" +
+    			"org.apache.pig.impl.storm.io.SpoutWrapper(" +
     				"'org.apache.pig.test.storm.TestSentenceSpout2') AS (sentence:chararray);");
     	pig.registerQuery("y = FOREACH y GENERATE FLATTEN(TOKENIZE(sentence));");
     	pig.registerQuery("y = FOREACH y GENERATE LOWER($0) AS word, 'y';");
 
     	pig.registerQuery("stoplist = LOAD '" + STOPWORDS_FILE + "' AS (stopword:chararray);");
-
+    	
     	pig.registerQuery("wordsr = JOIN x BY word, stoplist BY stopword USING 'replicated';");
 //    	explain("wordsr");
 //    	pig.registerQuery("STORE wordsr INTO 'fake_path';");
+
+    	// Tests for mixed static/dynamic stuff.
+    	pig.registerQuery("stoplist2 = LOAD '" + STOPWORDS_FILE + "' AS (stopword2:chararray);");
+    	pig.registerQuery("stoplist3 = JOIN stoplist BY stopword, stoplist2 BY stopword2;");
+    	pig.registerQuery("words_simple_join = JOIN x BY word, stoplist BY stopword;");
+    	pig.registerQuery("words_sl3 = JOIN x BY word, stoplist3 BY stopword;");
+//    	pig.registerQuery("words_sl3 = FOREACH words_sl3 GENERATE word;");
+//    	pig.registerQuery("words_sl3_2 = JOIN words_sl3 BY word, stoplist3 BY stopword;");
     	
-    	pig.registerQuery("words = JOIN x BY word, stoplist BY stopword;");
+    	explain("words_sl3");
+//    	explain("words_simple_join");
 //    	pig.registerQuery("STORE words INTO 'fake_path';");
-//    	explain("words");
 
 //    	pig.registerQuery("x = FILTER x BY $0 == 'the';");
 //    	pig.registerQuery("y = FILTER y BY $0 == 'the';");
@@ -206,7 +215,7 @@ public class TestStream extends TestCase {
     	// storm.trident.testing.FixedBatchSpout
     	// backtype.storm.testing.FixedTupleSpout
     	pig.registerQuery("x = LOAD '/dev/null' USING " +
-    			"org.apache.pig.impl.storm.SpoutWrapper(" +
+    			"org.apache.pig.impl.storm.io.SpoutWrapper(" +
     				"'org.apache.pig.test.storm.TestSentenceSpout') AS (sentence:chararray);");
 
     	// STREAM is asynchronous is how it returns results, we don't have enough to make it work in this case.
@@ -240,7 +249,7 @@ public class TestStream extends TestCase {
     @Test
     public void testWindow() throws Exception {
     	pig.registerQuery("x = LOAD '/dev/null' USING " +
-    			"org.apache.pig.impl.storm.SpoutWrapper(" +
+    			"org.apache.pig.impl.storm.io.SpoutWrapper(" +
     				"'org.apache.pig.test.storm.TestSentenceSpout') AS (sentence:chararray);");
     	
     	pig.registerQuery("x = FOREACH x GENERATE FLATTEN(TOKENIZE(sentence));");
@@ -256,7 +265,7 @@ public class TestStream extends TestCase {
     	pig.registerQuery("hist = FILTER hist BY freq > 0;");
 
 //    	explain("count");
-    	pig.registerQuery("STORE count INTO '/dev/null/1';");
+//    	pig.registerQuery("STORE count INTO '/dev/null/1';");
 //    	explain("hist");
 //    	pig.registerQuery("STORE hist INTO '/dev/null/1';");
     	

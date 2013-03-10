@@ -7,7 +7,7 @@ import org.apache.pig.data.DataByteArray;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.data.TupleFactory;
 import org.apache.pig.impl.io.NullableTuple;
-import org.apache.pig.impl.storm.SpoutWrapper;
+import org.apache.pig.impl.storm.io.SpoutWrapper;
 
 import backtype.storm.tuple.Values;
 

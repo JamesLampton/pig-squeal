@@ -25,6 +25,7 @@ public class SOperPlan extends OperatorPlan<StormOper> {
 	private MROperPlan replPlan;
 	public Set<FileSpec> replFiles = new HashSet<FileSpec>();
 	private Map<FileSpec, FileSpec> rFileMap;
+	private MROperPlan staticPlan;
 	
 	/* (non-Javadoc)
      * @see java.lang.Object#toString()
@@ -79,5 +80,13 @@ public class SOperPlan extends OperatorPlan<StormOper> {
 	
 	public Map<FileSpec, FileSpec> getReplFileMap() {
 		return rFileMap;
+	}
+
+	public void setStaticPlan(MROperPlan plan) {
+		staticPlan = plan;
+	}
+	
+	public MROperPlan getStaticPlan() {
+		return staticPlan;
 	}
 }
