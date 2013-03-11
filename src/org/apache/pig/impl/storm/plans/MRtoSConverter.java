@@ -27,6 +27,7 @@ import org.apache.pig.impl.plan.OperatorKey;
 import org.apache.pig.impl.plan.PlanException;
 import org.apache.pig.impl.plan.PlanWalker;
 import org.apache.pig.impl.plan.VisitorException;
+import org.apache.pig.impl.storm.io.NOPLoad;
 import org.apache.pig.impl.storm.io.SpoutWrapper;
 
 public class MRtoSConverter extends MROpPlanVisitor {
@@ -72,8 +73,8 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		}
 	}
 	
-	String getAlias(PhysicalPlan p, boolean useRoots) {
-//		System.out.println(useRoots + " Roots: " + p.getRoots() + " Leaves: " + p.getLeaves());
+	static public String getAlias(PhysicalPlan p, boolean useRoots) {
+		System.out.println(useRoots + " Roots: " + p.getRoots() + " Leaves: " + p.getLeaves());
 		if (useRoots) {
 			PhysicalOperator root = p.getRoots().get(0);
 			return root.getAlias();
@@ -122,6 +123,12 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		// Look for the input
 		for (PhysicalOperator po : mr.mapPlan.getRoots()) {
 			POLoad pl = (POLoad)po;
+			
+			if (pl instanceof NOPLoad) {
+				// Skip the static stuff.
+				continue;
+			}
+			
 //			System.err.println(po);
 			String fn = pl.getLFile().getFileName();
 			
@@ -173,6 +180,7 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		// Persist SOP
 		StormOper po;
 		// See if we're a window.
+		System.out.println("RED_ALIAS:");
 		String red_alias = (mr.combinePlan.size() > 0) ? getAlias(mr.combinePlan, false) : getAlias(mr.reducePlan, true);
 		String window_opts = pc.getProperties().getProperty(red_alias + "_window_opts");
 		if (mr.combinePlan.size() == 0 || window_opts != null) {
@@ -213,7 +221,7 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		// Start walking.
 		try {
 			// Pull out any static subtrees from the execution plan.
-			FixedLoadPathFixer flpf = new FixedLoadPathFixer(plan);
+			FixedLoadPathFixer flpf = new FixedLoadPathFixer(plan, pc);
 			flpf.convert();
 			if (flpf.getStaticPlan().size() > 0) {
 				splan.setStaticPlan(flpf.getStaticPlan());

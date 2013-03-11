@@ -69,24 +69,28 @@ public class StormLauncher extends Launcher {
 		// Now compile the plan into a Storm plan.
 		SOperPlan sp = compile(php, pc);
 		
-		// If there is a replicated join build portion, execute it now.
-		if (sp.getReplPlan() != null) {
-			log.info("Launching Hadoop jobs to build replicated join input...");
-			NoCompileMapReduceLauncher mrlauncher = new NoCompileMapReduceLauncher(sp.getReplPlan());
+		// If there is a static portion portion, execute it now.
+		// TODO: Put this back.
+		if (false && sp.getStaticPlan() != null) {
+			log.info("Launching Hadoop jobs to perform static calculations...");
+			NoCompileMapReduceLauncher mrlauncher = new NoCompileMapReduceLauncher(sp.getStaticPlan());
 			PigStats ps = mrlauncher.launchPig(php, grpName, pc);
 			if (ps.getReturnCode() != ReturnCode.SUCCESS) {
-				log.warn("Ran into issues building the replicated join files, aborting.");
+				log.warn("Ran into issues running static portion of job, aborting.");
 				return ps;
 			}
 			
+			// For replicated join files:
 			// The temp files will be deleted by Pig's Main.  The topology will live on
 			// beyond this window, so we will move all the temp files to a new location.
-			DataStorage dfs = pc.getDfs();
-			for (Entry<FileSpec, FileSpec> ent : sp.getReplFileMap().entrySet()) {
-				log.info("Moving " + ent.getKey() + " to " + ent.getValue());
-				ElementDescriptor fn_from = dfs.asElement(ent.getKey().getFileName());
-				ElementDescriptor fn_to = dfs.asElement(ent.getValue().getFileName());
-				fn_from.rename(fn_to);
+			if (sp.getReplFileMap() != null) {
+				DataStorage dfs = pc.getDfs();
+				for (Entry<FileSpec, FileSpec> ent : sp.getReplFileMap().entrySet()) {
+					log.info("Moving " + ent.getKey() + " to " + ent.getValue());
+					ElementDescriptor fn_from = dfs.asElement(ent.getKey().getFileName());
+					ElementDescriptor fn_to = dfs.asElement(ent.getValue().getFileName());
+					fn_from.rename(fn_to);
+				}
 			}
 		}
 

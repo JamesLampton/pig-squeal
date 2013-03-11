@@ -90,6 +90,11 @@ public class Main {
 //				splan.getPLSpoutLink((POLoad) po);
 				Stream input = sop_streams.get(input_sop);
 				
+				if (input == null) {
+					// Probably a static load.
+					continue;
+				}
+				
 				MultiMap<PhysicalOperator, PhysicalOperator> opmap = new MultiMap<PhysicalOperator, PhysicalOperator>();
 				sop.getPlan().setOpMap(opmap);
 				PhysicalPlan clonePlan = sop.getPlan().clone();

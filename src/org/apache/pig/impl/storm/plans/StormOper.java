@@ -82,12 +82,15 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 		return alias;
 	}
 	
-	public StateFactory getStateFactory(PigContext pc) {
+	static public StateFactory getStateFactory(PigContext pc, String alias) {
 		// Pull the leaf's name and look for storage options.
 		String store_opts = pc.getProperties().getProperty(alias + "_store_opts");
-		
+//		System.out.println("getStateFactory: " + alias + " args: " + store_opts);
 		return new StateWrapper(store_opts).getStateFactory();
-//		return new LRUMemoryMapState.Factory(10000);
+	}
+	
+	public StateFactory getStateFactory(PigContext pc) {
+		return getStateFactory(pc, alias);
 	}
 	
 	public String getStateFactoryOpts(PigContext pc) {

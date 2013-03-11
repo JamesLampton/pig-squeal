@@ -70,9 +70,9 @@ public class SOperPlan extends OperatorPlan<StormOper> {
 		this.replPlan = replPlan;
 	}
 
-	public MROperPlan getReplPlan() {
-		return replPlan;
-	}
+//	public MROperPlan getReplPlan() {
+//		return replPlan;
+//	}
 
 	public void setReplFileMap(Map<FileSpec, FileSpec> replFileMap) {
 		this.rFileMap = replFileMap;

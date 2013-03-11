@@ -15,12 +15,14 @@ import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.PhyPlanSette
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.MROpPlanVisitor;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.MROperPlan;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.PhysicalOperator;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.expressionOperators.ConstantExpression;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhyPlanVisitor;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhysicalPlan;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POFRJoin;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLocalRearrange;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
+import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.io.FileSpec;
 import org.apache.pig.impl.plan.DependencyOrderWalker;
 import org.apache.pig.impl.plan.DepthFirstWalker;
@@ -31,7 +33,10 @@ import org.apache.pig.impl.plan.PlanException;
 import org.apache.pig.impl.plan.PlanWalker;
 import org.apache.pig.impl.plan.ReverseDependencyOrderWalker;
 import org.apache.pig.impl.plan.VisitorException;
+import org.apache.pig.impl.storm.io.NOPLoad;
 import org.apache.pig.impl.storm.io.SpoutWrapper;
+import org.apache.pig.impl.storm.io.TridentStatePack;
+import org.apache.pig.impl.util.MultiMap;
 
 /**
  * The purpose of this class is to find fixed elements within the MapReduce
@@ -51,15 +56,24 @@ public class FixedLoadPathFixer extends MROpPlanVisitor {
 
 	Set<String> staticFiles = new HashSet<String>();
 	Set<MapReduceOper> staticMOPs = new HashSet<MapReduceOper>();
+	Set<POLoad> staticLoads = new HashSet<POLoad>();
 	Map<String, MapReduceOper> fnToMOP = new HashMap<String, MapReduceOper>();
 	Map<String, MapReduceOper> staticFnToMOP = new HashMap<String, MapReduceOper>();
 	List<MapReduceOper> mixMOP = new ArrayList<MapReduceOper>();
+	private PigContext pc;
 	
 	//	Map<FileSpec, FileSpec> rFileMap = new HashMap<FileSpec, FileSpec>();
+	
+	PhysicalOperator getNOP(POLoad load) {
+		String scope = load.getOperatorKey().getScope();
+		return new NOPLoad(new OperatorKey(scope, NodeIdGenerator.getGenerator().getNextNodeId(scope)), load);
 
-	public FixedLoadPathFixer(MROperPlan plan) {
+	}
+
+	public FixedLoadPathFixer(MROperPlan plan, PigContext pc) {
 		super(plan, new DependencyOrderWalker<MapReduceOper, MROperPlan>(plan));
 		this.plan = plan;
+		this.pc = pc;
 	}
 
 	class LoadFinder extends PhyPlanVisitor {
@@ -85,23 +99,13 @@ public class FixedLoadPathFixer extends MROpPlanVisitor {
 		// We will build a static plan and prune the dynamic plan.
 		for (POLoad load : load_list) {
 			String fn = load.getLFile().getFileName();
-			if (load.getLoadFunc() instanceof SpoutWrapper) {
+			if (load.getLoadFunc() instanceof SpoutWrapper || (fnToMOP.containsKey(fn) && !staticFiles.contains(fn))) {
 				// This data comes from a path with a streaming component.
 				streamedInputCount += 1;
-				System.out.println("STREAMING DIRECT LOAD: " + fn);
-			} else if (fnToMOP.containsKey(fn)) {
-				// This file is an intermediate result and may come from streaming input.
-				if (staticFiles.contains(fn)) {
-					System.out.println("INTERMEDIATE STATIC LOAD: " + load);
-					staticInputCount += 1;
-				} else {
-					System.out.println("INTERMEDIATE STREAM LOAD: " + load);					
-					streamedInputCount += 1;
-				}
 			} else {
-				// Completely static, replace with a NOP Loader for the streaming plan.
-				System.out.println("STATIC LOAD: " + load);
+				// Static
 				staticInputCount += 1;				
+				staticLoads.add(load);
 			}
 		}
 		
@@ -171,8 +175,12 @@ public class FixedLoadPathFixer extends MROpPlanVisitor {
 			// the data into a trident state.
 			addLoadStateOper(mr, static_preds, load_list);
 			
-			// Replace all the static loads with NOP loaders.
-			// TODO
+			// Replace all the static loads with NOPs
+			for (POLoad load : load_list) {
+				if (staticLoads.contains(load)) {
+					mr.mapPlan.replace(load, getNOP(load));					
+				}
+			}
 		}
 	}
 	
@@ -205,15 +213,33 @@ public class FixedLoadPathFixer extends MROpPlanVisitor {
 		MapReduceOper state_mr = new MapReduceOper(new OperatorKey(scope, NodeIdGenerator.getGenerator().getNextNodeId(scope)));
 
 		// Clone the Map plan from mr.
+		MultiMap<PhysicalOperator, PhysicalOperator> opmap = new MultiMap<PhysicalOperator, PhysicalOperator>();
+		mr.mapPlan.setOpMap(opmap);
 		state_mr.mapPlan = mr.mapPlan.clone();
 		state_mr.mapKeyType = mr.mapKeyType;
+		mr.mapPlan.resetOpMap();
 		
-		// Replace the non-static loads with NOP loaders.
-		// TODO
+		// Replace the Stream loads with NOPs.
+		for (POLoad load : load_list) {
+			if (!staticLoads.contains(load)) {
+				PhysicalOperator cloned_load = opmap.get(load).get(0);
+				state_mr.mapPlan.replace(cloned_load, getNOP((POLoad) cloned_load));					
+			}
+		}
 		
 		// Create a new reduce plan that stores the data into the state.
-		// TODO
-		state_mr.reducePlan = null;
+		state_mr.reducePlan = new PhysicalPlan();
+		
+		// Oddly, MRToSConverter's getAlias returns null in this case...
+		String alias = mr.reducePlan.getLeaves().get(0).getAlias();
+//		System.out.println("getAlias: " + MRtoSConverter.getAlias(mr.mapPlan, false) + " alias: " + alias);
+		
+		// TODO: Pass in specific combiner.
+		TridentStatePack pack = new TridentStatePack(
+				new OperatorKey(scope, NodeIdGenerator.getGenerator().getNextNodeId(scope)),
+				StormOper.getStateFactory(pc, alias));
+		pack.setKeyType(mr.mapKeyType);
+		state_mr.reducePlan.add(pack);
 		
 		// Add the dependencies to using the static preds.
 		staticPlan.add(state_mr);

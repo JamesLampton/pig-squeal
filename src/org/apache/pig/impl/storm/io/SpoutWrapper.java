@@ -2,12 +2,17 @@ package org.apache.pig.impl.storm.io;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.hadoop.mapreduce.InputFormat;
+import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.RecordReader;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.pig.Expression;
 import org.apache.pig.LoadCaster;
 import org.apache.pig.LoadFunc;
@@ -81,10 +86,27 @@ public class SpoutWrapper extends LoadFunc implements LoadMetadata, LoadCaster {
 		
 	}
 
+	static public class EmptyInputFormat extends InputFormat {
+
+		@Override
+		public RecordReader createRecordReader(InputSplit arg0,
+				TaskAttemptContext arg1) throws IOException,
+				InterruptedException {
+			// This should never be called.
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		public List getSplits(JobContext arg0) throws IOException,
+				InterruptedException {
+			return new ArrayList();
+		}
+	}
+	
 	@Override
 	public InputFormat getInputFormat() throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+		return new EmptyInputFormat();
 	}
 
 	@Override
