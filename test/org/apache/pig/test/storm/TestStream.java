@@ -192,17 +192,17 @@ public class TestStream extends TestCase {
     	pig.registerQuery("stoplist2 = LOAD '" + STOPWORDS_FILE + "' AS (stopword2:chararray);");
     	pig.registerQuery("stoplist3 = JOIN stoplist BY stopword, stoplist2 BY stopword2;");
     	
-    	pig.registerQuery("x = FILTER x BY $0 == 'the';");
+//    	pig.registerQuery("x = FILTER x BY $0 == 'the';");
     	pig.registerQuery("words_simple_join = JOIN x BY word, stoplist BY stopword;");
     	pig.registerQuery("words_sl3 = JOIN x BY word, stoplist3 BY stopword;");
 //    	pig.registerQuery("words_sl3 = FOREACH words_sl3 GENERATE word;");
 //    	pig.registerQuery("words_sl3_2 = JOIN words_sl3 BY word, stoplist3 BY stopword;");
     	
 //    	explain("words_simple_join");
-//    	props.setProperty("words_sl3_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"expiration\": 300, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
-    	props.setProperty("words_sl3_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
-    	explain("words_sl3");
-//    	pig.registerQuery("STORE words_sl3 INTO 'fake_path';");
+    	props.setProperty("words_sl3_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"expiration\": 300, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
+//    	props.setProperty("words_sl3_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
+//    	explain("words_sl3");
+    	pig.registerQuery("STORE words_sl3 INTO 'fake_path';");
 
 //    	pig.registerQuery("x = FILTER x BY $0 == 'the';");
 //    	pig.registerQuery("y = FILTER y BY $0 == 'the';");

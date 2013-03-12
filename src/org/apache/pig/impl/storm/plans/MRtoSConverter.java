@@ -15,6 +15,7 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.PhysicalOpera
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhyPlanVisitor;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhysicalPlan;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POFRJoin;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POJoinPackage;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLocalRearrange;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
@@ -74,17 +75,21 @@ public class MRtoSConverter extends MROpPlanVisitor {
 	}
 	
 	static public String getAlias(PhysicalPlan p, boolean useRoots) {
-		System.out.println(useRoots + " Roots: " + p.getRoots() + " Leaves: " + p.getLeaves());
+//		System.out.println(useRoots + " Roots: " + p.getRoots() + " Leaves: " + p.getLeaves());
 		if (useRoots) {
 			PhysicalOperator root = p.getRoots().get(0);
-			return root.getAlias();
+			if (root instanceof POJoinPackage) {
+				root = p.getSuccessors(root).get(0);
+			}
+			return (root == null) ? null : root.getAlias();
 		}
 		
 		PhysicalOperator leaf = p.getLeaves().get(0);
+		String alias = leaf.getAlias();
 		if (leaf instanceof POStore) {
 			leaf = p.getPredecessors(leaf).get(0);
 		}
-		return (leaf == null) ? null : leaf.getAlias();
+		return (leaf == null || leaf.getAlias() == null) ? alias : leaf.getAlias();
 	}
 	
 	private class FRJoinFinder extends PhyPlanVisitor {
@@ -180,9 +185,9 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		// Persist SOP
 		StormOper po;
 		// See if we're a window.
-		System.out.println("RED_ALIAS:");
 		String red_alias = (mr.combinePlan.size() > 0) ? getAlias(mr.combinePlan, false) : getAlias(mr.reducePlan, true);
 		String window_opts = pc.getProperties().getProperty(red_alias + "_window_opts");
+//		System.out.println("RED_ALIAS: " + red_alias + " window_opts: " + window_opts);
 		if (mr.combinePlan.size() == 0 || window_opts != null) {
 			// Basic reduce or windowed group operator.
 			po = getSOp(StormOper.OpType.BASIC_PERSIST, red_alias);

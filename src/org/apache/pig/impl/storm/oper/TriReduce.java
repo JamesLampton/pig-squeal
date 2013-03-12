@@ -163,7 +163,7 @@ public class TriReduce extends StormBaseFunction {
 	
 	@Override
 	public void execute(TridentTuple tri_tuple, TridentCollector collector) {
-		System.out.println("TriReduce input: " + tri_tuple);
+//		System.out.println("TriReduce input: " + tri_tuple);
 		
 		PigNullableWritable key = (PigNullableWritable) tri_tuple.get(0);
 	
@@ -181,7 +181,7 @@ public class TriReduce extends StormBaseFunction {
 			runReduce(key, tuples, fc);
 		}
 		
-		System.out.println("TriReduce |last_input|: " + ((tuples == null) ? 0 : tuples.size()) + " |last_output| : " + fc.last_res.size());
+//		System.out.println("TriReduce |last_input|: " + ((tuples == null) ? 0 : tuples.size()) + " |last_output| : " + fc.last_res.size());
 
 		// Calculate the current values.
 		if (windowedInput) {
@@ -192,8 +192,7 @@ public class TriReduce extends StormBaseFunction {
 		fc.switchToCur();
 		runReduce(key, tuples, fc);
 		
-		System.out.println("CUR tuples: " + tuples);
-		System.out.println("TriReduce |cur_input|: " + tuples.size() + " |cur_output| : " + fc.cur_res.size());
+//		System.out.println("TriReduce |cur_input|: " + tuples.size() + " |cur_output| : " + fc.cur_res.size());
 
 		// Emit positive and negative values.
 		fc.emitValues();

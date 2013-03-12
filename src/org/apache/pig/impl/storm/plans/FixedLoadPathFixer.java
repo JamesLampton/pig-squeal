@@ -135,13 +135,13 @@ public class FixedLoadPathFixer extends MROpPlanVisitor {
 		// Start walking.
 		try {
 			visit();
-			System.out.println("STATIC FILES: " + staticFiles);
-			for (MapReduceOper mr : mixMOP) {
-				System.out.println("MIX OP: " + mr.getOperatorKey());
-			}
-			for (MapReduceOper mr : staticMOPs) {
-				System.out.println("Static OP: " + mr.getOperatorKey());
-			}
+//			System.out.println("STATIC FILES: " + staticFiles);
+//			for (MapReduceOper mr : mixMOP) {
+//				System.out.println("MIX OP: " + mr.getOperatorKey());
+//			}
+//			for (MapReduceOper mr : staticMOPs) {
+//				System.out.println("Static OP: " + mr.getOperatorKey());
+//			}
 			extractStaticPlans();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -150,7 +150,7 @@ public class FixedLoadPathFixer extends MROpPlanVisitor {
 	
 	private void extractStaticPlans() throws PlanException, VisitorException, CloneNotSupportedException {
 		for (MapReduceOper mr : mixMOP) {
-			System.out.println("MIX OP -- PROC: " + mr.getOperatorKey());
+//			System.out.println("MIX OP -- PROC: " + mr.getOperatorKey());
 			
 			List<MapReduceOper> preds = new ArrayList<MapReduceOper>();
 			if (plan.getPredecessors(mr) != null) {
@@ -185,7 +185,7 @@ public class FixedLoadPathFixer extends MROpPlanVisitor {
 	}
 	
 	private void moveToStaticPlan(MapReduceOper mr_cur) throws PlanException {
-		System.out.println("moveToStaticPlan: " + mr_cur.getOperatorKey());
+//		System.out.println("moveToStaticPlan: " + mr_cur.getOperatorKey());
 		
 		// We're going to do this recursively.
 		List<MapReduceOper> preds = plan.getPredecessors(mr_cur);

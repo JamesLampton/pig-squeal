@@ -71,7 +71,7 @@ public class StormLauncher extends Launcher {
 		
 		// If there is a static portion portion, execute it now.
 		// TODO: Put this back.
-		if (false && sp.getStaticPlan() != null) {
+		if (true && sp.getStaticPlan() != null) {
 			log.info("Launching Hadoop jobs to perform static calculations...");
 			NoCompileMapReduceLauncher mrlauncher = new NoCompileMapReduceLauncher(sp.getStaticPlan());
 			PigStats ps = mrlauncher.launchPig(php, grpName, pc);

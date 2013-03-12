@@ -1,5 +1,6 @@
 package org.apache.pig.impl.storm.oper;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -55,6 +56,17 @@ public class CombineWrapper implements CombinerAggregator<MapWritable> {
 	public MapWritable zero() {
 		return new MapWritable();		
 	}
+	
+	static Comparator<NullableTuple> NullableTupleComparator = new Comparator<NullableTuple>() {
+		@Override
+		public int compare(NullableTuple o1, NullableTuple o2) {
+			int res = o1.getIndex() - o2.getIndex();
+			if (res == 0) {
+				return o1.compareTo(o2);
+			}
+			return res;
+		}
+	};
 
 	public static List<NullableTuple> getTuples(MapWritable m, Text which) {
 
@@ -72,7 +84,7 @@ public class CombineWrapper implements CombinerAggregator<MapWritable> {
 		}
 		
 		// Sort the tuples as the shuffle would.
-		Collections.sort(ret);
+		Collections.sort(ret, NullableTupleComparator);
 		
 		return ret;
 	}	
