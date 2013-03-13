@@ -22,7 +22,6 @@ public class SOperPlan extends OperatorPlan<StormOper> {
 	public Set<String> UDFs = new HashSet<String>();
 	public Map<POLoad, StormOper> PLSpoutLink = new HashMap<POLoad, StormOper>();
 	private Map<String, StormOper> rootMap;
-	public Set<FileSpec> replFiles = new HashSet<FileSpec>();
 	private Map<FileSpec, FileSpec> rFileMap;
 	private MROperPlan staticPlan;
 	

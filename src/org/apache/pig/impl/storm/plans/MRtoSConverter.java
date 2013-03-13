@@ -92,32 +92,11 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		return (leaf == null || leaf.getAlias() == null) ? alias : leaf.getAlias();
 	}
 	
-	private class FRJoinFinder extends PhyPlanVisitor {
-
-		private Set<FileSpec> replFiles;
-
-		public FRJoinFinder(PhysicalPlan plan, Set<FileSpec> replFiles) {
-			super(plan, new DependencyOrderWalker<PhysicalOperator, PhysicalPlan>(plan));
-			this.replFiles = replFiles;
-		}
-		
-	    @Override
-	    public void visitFRJoin(POFRJoin join) throws VisitorException {
-	    	// Extract the files.
-	    	for (FileSpec f : join.getReplFiles()) {
-	    		replFiles.add(f);
-	    	}
-	    }
-	}
-	
 	public void visitMROp(MapReduceOper mr) throws VisitorException {
 		splan.UDFs.addAll(mr.UDFs);
 		
 		new PhyPlanSetter(mr.mapPlan).visit();
         new PhyPlanSetter(mr.reducePlan).visit();
-        
-        new FRJoinFinder(mr.mapPlan, splan.replFiles).visit();
-        new FRJoinFinder(mr.reducePlan, splan.replFiles).visit();        
         
 		// Map SOP -- Attach to Spout or to Reduce SOP -- replace LOADs
 		// Optional Spout Point (May hook onto the end of a Reduce SOP)

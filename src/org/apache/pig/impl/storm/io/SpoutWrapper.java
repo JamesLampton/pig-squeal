@@ -41,19 +41,21 @@ public class SpoutWrapper extends LoadFunc implements LoadMetadata, LoadCaster {
 
 	private String spoutClass;
 	private String jsonArgs;
+	private String parallelismHint;
 
 	public SpoutWrapper() {
-		this(null, null);
+		this(null, null, null);
 	}
 	
 	public SpoutWrapper(String spoutClass) {
-		this(spoutClass, null);
+		this(spoutClass, null, null);
 	}
 	
-	public SpoutWrapper(String spoutClass, String jsonArgs) {
+	public SpoutWrapper(String spoutClass, String jsonArgs, String parallelismHint) {
 //		System.out.println("SpoutWrapper created: " + spoutClass + " " + jsonArgs);
 		this.spoutClass = spoutClass;
 		this.jsonArgs = jsonArgs;
+		this.parallelismHint = parallelismHint;
 	}
 	
 	public String getSpoutClass() {
