@@ -36,6 +36,7 @@ import backtype.storm.tuple.Fields;
 import backtype.storm.utils.Utils;
 
 import storm.trident.Stream;
+import storm.trident.TridentState;
 import storm.trident.TridentTopology;
 import storm.trident.fluent.GroupedStream;
 import storm.trident.operation.builtin.Debug;
@@ -143,6 +144,11 @@ public class Main {
 			if (sop.getType() == StormOper.OpType.SPOUT) {
 				output = topology.newStream(sop.getOperatorKey().toString(), sop.getLoadFunc());
 				
+				// Allow more than one to run.
+				if (sop.getParallelismHint() != 0) {
+					output.parallelismHint(sop.getParallelismHint());
+				}
+				
 				// Add the conversion routine to the end to switch from Storm to Pig tuples.
 				output = output.each(
 							output.getOutputFields(), 
@@ -191,23 +197,31 @@ public class Main {
 					}
 
 					// Group and aggregate
-					output = input.groupBy(group_key)
+					TridentState gr_persist = input.groupBy(group_key)
 							.persistentAggregate(
 								sop.getStateFactory(pc),
 								orig_input_fields,
 								agg, 
 								output_fields
-							).newValuesStream();
+							);
+					if (sop.getParallelismHint() > 0) {
+						gr_persist.parallelismHint(sop.getParallelismHint());
+					}
+					output = gr_persist.newValuesStream();
 				} else {
 					// When windowing, we don't want to use any combiner logic.
 					// Group and aggregate
-					output = input.groupBy(group_key)
+					TridentState gr_persist = input.groupBy(group_key)
 							.persistentAggregate(
 								sop.getStateFactory(pc),
 								orig_input_fields,
 								new ReduceWrapper(new TriWindowPersist(sop.getWindowOptions()), true), 
 								output_fields
-							).newValuesStream();
+							);
+					if (sop.getParallelismHint() > 0) {
+						gr_persist.parallelismHint(sop.getParallelismHint());
+					}
+					output = gr_persist.newValuesStream();
 				}
 				
 				// Re-alias the raw as the key.

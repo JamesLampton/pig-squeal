@@ -52,6 +52,8 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 	IRichSpout spout;
 	public boolean isCombined;
 	private String windowOpts;
+	private Object parall;
+	private int parallelismHint;
 
 	public void setSpout(IRichSpout spout) {
 		this.spout = spout;
@@ -118,5 +120,12 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 
 	public String getWindowOptions() {
 		return windowOpts;
+	}
+
+	public void setParallelismHint(int parallelismHint) {
+		this.parallelismHint = parallelismHint;
+	}
+	public int getParallelismHint() {
+		return parallelismHint;
 	}
 }

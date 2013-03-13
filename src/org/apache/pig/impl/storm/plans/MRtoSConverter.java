@@ -121,6 +121,7 @@ public class MRtoSConverter extends MROpPlanVisitor {
 				// Create a new StormOper for this spout.
 				StormOper spout = getSOp(StormOper.OpType.SPOUT, po.getAlias());
 				SpoutWrapper sw = ((SpoutWrapper)pl.getLoadFunc());
+				spout.setParallelismHint(sw.getParallelismHint());
 				spout.setSpout(sw.getSpout());
 				splan.add(spout);
 				splan.addPLSpoutLink(spout, pl);
@@ -176,6 +177,9 @@ public class MRtoSConverter extends MROpPlanVisitor {
 			po = getSOp(StormOper.OpType.COMBINE_PERSIST, getAlias(mr.combinePlan, false));
 			po.setPlan(mr.combinePlan);
 			po.mapKeyType = mr.mapKeyType;
+		}
+		if (mr.getRequestedParallelism() > 0) {
+			po.setParallelismHint(mr.getRequestedParallelism());
 		}
 		splan.add(po);
 		try {
