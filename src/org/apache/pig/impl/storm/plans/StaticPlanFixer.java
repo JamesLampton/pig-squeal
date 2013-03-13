@@ -39,7 +39,7 @@ import org.apache.pig.impl.storm.io.TridentStatePack;
 import org.apache.pig.impl.util.MultiMap;
 
 /**
- * The purpose of this class is to find fixed elements within the MapReduce
+ * The purpose of this class is to find static elements within the MapReduce
  * plan and to execute Hadoop jobs to place the appropriate data into the
  * Trident State.
  * 
@@ -49,7 +49,7 @@ import org.apache.pig.impl.util.MultiMap;
  * @author jhl1
  *
  */
-public class FixedLoadPathFixer extends MROpPlanVisitor {
+public class StaticPlanFixer extends MROpPlanVisitor {
 
 	private MROperPlan plan;
 	private MROperPlan staticPlan = new MROperPlan();
@@ -70,7 +70,7 @@ public class FixedLoadPathFixer extends MROpPlanVisitor {
 
 	}
 
-	public FixedLoadPathFixer(MROperPlan plan, PigContext pc) {
+	public StaticPlanFixer(MROperPlan plan, PigContext pc) {
 		super(plan, new DependencyOrderWalker<MapReduceOper, MROperPlan>(plan));
 		this.plan = plan;
 		this.pc = pc;

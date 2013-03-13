@@ -31,6 +31,8 @@ import org.apache.pig.impl.io.FileSpec;
 import org.apache.pig.impl.plan.PlanException;
 import org.apache.pig.impl.plan.VisitorException;
 import org.apache.pig.impl.storm.plans.MRtoSConverter;
+import org.apache.pig.impl.storm.plans.ReplJoinFileFixer;
+import org.apache.pig.impl.storm.plans.ReplJoinFixer;
 import org.apache.pig.impl.storm.plans.SOperPlan;
 import org.apache.pig.impl.storm.plans.SPrinter;
 import org.apache.pig.impl.util.JarManager;
@@ -91,6 +93,9 @@ public class StormLauncher extends Launcher {
 					ElementDescriptor fn_to = dfs.asElement(ent.getValue().getFileName());
 					fn_from.rename(fn_to);
 				}
+				
+				// Alter the plan to load from the new locations.
+				new ReplJoinFileFixer(sp).convert();
 			}
 		}
 

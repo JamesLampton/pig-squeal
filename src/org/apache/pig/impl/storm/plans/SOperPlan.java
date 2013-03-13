@@ -22,7 +22,6 @@ public class SOperPlan extends OperatorPlan<StormOper> {
 	public Set<String> UDFs = new HashSet<String>();
 	public Map<POLoad, StormOper> PLSpoutLink = new HashMap<POLoad, StormOper>();
 	private Map<String, StormOper> rootMap;
-	private MROperPlan replPlan;
 	public Set<FileSpec> replFiles = new HashSet<FileSpec>();
 	private Map<FileSpec, FileSpec> rFileMap;
 	private MROperPlan staticPlan;
@@ -65,14 +64,6 @@ public class SOperPlan extends OperatorPlan<StormOper> {
 			return rootMap.get(pl.getLFile().getFileName());
 		}
 	}
-
-	public void setReplPlan(MROperPlan replPlan) {
-		this.replPlan = replPlan;
-	}
-
-//	public MROperPlan getReplPlan() {
-//		return replPlan;
-//	}
 
 	public void setReplFileMap(Map<FileSpec, FileSpec> replFileMap) {
 		this.rFileMap = replFileMap;

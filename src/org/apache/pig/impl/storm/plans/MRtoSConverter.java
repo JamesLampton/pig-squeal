@@ -226,19 +226,17 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		// Start walking.
 		try {
 			// Pull out any static subtrees from the execution plan.
-			FixedLoadPathFixer flpf = new FixedLoadPathFixer(plan, pc);
-			flpf.convert();
-			if (flpf.getStaticPlan().size() > 0) {
-				splan.setStaticPlan(flpf.getStaticPlan());
-			}
-			
+			StaticPlanFixer spf = new StaticPlanFixer(plan, pc);
+			spf.convert();
 			// Pull out the replicated join creation plan.
-//			ReplJoinFixer rjf = new ReplJoinFixer(plan);
-//			rjf.convert();
-//			if (rjf.getReplPlan().size() > 0) {
-//				splan.setReplPlan(rjf.getReplPlan());
-//				splan.setReplFileMap(rjf.getReplFileMap());
-//			}
+			ReplJoinFixer rjf = new ReplJoinFixer(plan, spf.getStaticPlan());
+			rjf.convert();
+			if (rjf.getReplFileMap().size() > 0) {
+				splan.setReplFileMap(rjf.getReplFileMap());
+			}
+			if (spf.getStaticPlan().size() > 0) {
+				splan.setStaticPlan(spf.getStaticPlan());
+			}
 			
 			visit();
 			splan.setRootMap(rootMap);

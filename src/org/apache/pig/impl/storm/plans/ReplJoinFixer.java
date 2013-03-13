@@ -44,15 +44,17 @@ import org.apache.pig.impl.storm.io.SpoutWrapper;
 public class ReplJoinFixer extends MROpPlanVisitor {
 
 	private MROperPlan plan;
-	private MROperPlan replPlan = new MROperPlan();
+	private MROperPlan staticPlan = new MROperPlan();
 	Map<String, MapReduceOper> fnToMOP = new HashMap<String, MapReduceOper>();
 	Map<FileSpec, FileSpec> rFileMap = new HashMap<FileSpec, FileSpec>();
+	boolean swapFiles = false;
 
 //	private Set<FileSpec> replFiles = new HashSet<FileSpec>();
 	
-	public ReplJoinFixer(MROperPlan plan) {
+	public ReplJoinFixer(MROperPlan plan, MROperPlan staticPlan) {
 		super(plan, new DependencyOrderWalker<MapReduceOper, MROperPlan>(plan));
 		this.plan = plan;
+		this.staticPlan = staticPlan;
 	}
 	
 	class FRJoinFinder extends PhyPlanVisitor {
@@ -85,12 +87,41 @@ public class ReplJoinFixer extends MROpPlanVisitor {
 //	    		System.out.println("Join: " + join + " " + f);
 //	    		replFiles.add(f);
 	    	}
+	    }
+	}
+	
+	class FRJoinFileReplacer extends PhyPlanVisitor {
+		
+		public FRJoinFileReplacer(PhysicalPlan plan) {
+			super(plan, new DependencyOrderWalker<PhysicalOperator, PhysicalPlan>(plan));
+		}
+		
+	    @Override
+	    public void visitFRJoin(POFRJoin join) throws VisitorException {
+	    	List<FileSpec> newrepl = new ArrayList<FileSpec>();
+	    	
+	    	// Extract the files.
+	    	for (FileSpec f : join.getReplFiles()) {
+	    		if (f == null) {
+	    			newrepl.add(f);
+	    			continue;
+	    		}
+	    		
+	    		// Use the rFileMap to swap things.
+	    		newrepl.add(rFileMap.get(f));
+	    	}
 	    	
 	    	join.setReplFiles(newrepl.toArray(join.getReplFiles()));
 	    }
 	}
-	
+		
 	public void visitMROp(MapReduceOper mr) throws VisitorException {
+		if (swapFiles) {
+			new FRJoinFileReplacer(mr.mapPlan).visit();
+	        new FRJoinFileReplacer(mr.reducePlan).visit();
+			return;
+		}
+		
 		// Cycle through the leaves adding them to the fnToMOP.
 		List<PhysicalOperator> leaves = new ArrayList<PhysicalOperator>(mr.mapPlan.size() + mr.reducePlan.size());
 		leaves.addAll(mr.mapPlan.getLeaves());
@@ -109,6 +140,17 @@ public class ReplJoinFixer extends MROpPlanVisitor {
 	}
 	
 	public void convert() {
+		convert(null);
+	}
+	
+	public void convert(Map<FileSpec, FileSpec> rFileMap) {
+		if (rFileMap == null) {
+			swapFiles = false;
+		} else {
+			this.rFileMap = rFileMap;
+			swapFiles = true;
+		}
+		
 		// Start walking.
 		try {
 			visit();
@@ -128,13 +170,18 @@ public class ReplJoinFixer extends MROpPlanVisitor {
 	}
 
 	private void moveToReplPlan(MapReduceOper mr_cur) throws PlanException {
+		// This op was probably moved by the StaticPlanFixer.
+		if (mr_cur == null) {
+			return;
+		}
+		
 		// We're going to do this recursively.
 		List<MapReduceOper> preds = plan.getPredecessors(mr_cur);
-		
+				
 		// Remove the current operator.
 		plan.remove(mr_cur);
 		// Put it into the new plan.
-		replPlan.add(mr_cur);
+		staticPlan.add(mr_cur);
 		
 		if (preds == null) {
 			return;
@@ -144,12 +191,8 @@ public class ReplJoinFixer extends MROpPlanVisitor {
 			// Move all the predecessors.
 			moveToReplPlan(pred);
 			// And link in the new plan.
-			replPlan.connect(pred, mr_cur);
+			staticPlan.connect(pred, mr_cur);
 		}
-	}
-	
-	public MROperPlan getReplPlan() {
-		return replPlan;
 	}
 
 	public Map<FileSpec, FileSpec> getReplFileMap() {
