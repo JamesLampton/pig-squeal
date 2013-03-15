@@ -8,14 +8,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.io.ArrayWritable;
 import org.apache.hadoop.io.Writable;
+import org.apache.pig.backend.hadoop.HDataType;
 
 public class WindowBuffer<T extends Writable> implements Writable {
 
 	private int maxSize;
 	
 	// Maps object value to the head of the value's linked list.
-	Map<T, Element> valMap;
+	Map<Writable, Element> valMap;
 	ArrayList<Element> window;
 	int[] free_list;
 	int alloc_size = 0;
@@ -36,7 +38,7 @@ public class WindowBuffer<T extends Writable> implements Writable {
 		
 		// The following are only valid for the head of the value list.		
 		// The value itself.
-		T val;
+		Writable val;
 		// The number of times this value appears.
 		int count;
 		// And the last element with this value.
@@ -48,7 +50,7 @@ public class WindowBuffer<T extends Writable> implements Writable {
 			count = 0;
 		}
 		
-		void configure(T val, int count, Element tailByValue) {
+		void configure(Writable val, int count, Element tailByValue) {
 			this.val = val;
 			this.count = count;
 			this.tailByValue = tailByValue;
@@ -64,14 +66,17 @@ public class WindowBuffer<T extends Writable> implements Writable {
 	}
 	
 	public WindowBuffer(int maxSize) {
+		init(maxSize);
+	}
+	
+	void init(int maxSize) {
 		this.maxSize = maxSize;
 		window = new ArrayList<Element>(maxSize);
-		valMap = new HashMap<T, Element>(maxSize);
+		valMap = new HashMap<Writable, Element>(maxSize);
 		free_list = new int[maxSize];
 		head = tail = -1;
 		cur_count = 0;
 	}
-	
 
 	void addToWindowTail(Element e) {
 		if (tail == -1) {
@@ -123,10 +128,10 @@ public class WindowBuffer<T extends Writable> implements Writable {
 		cur_count--;
 	}
 	
-	public void push(T o) {
+	public void push(Writable o) {
 		// If we're over size, remove the head.
 		if (cur_count == maxSize) {
-			T head_o = window.get(head).val;
+			T head_o = (T) window.get(head).val;
 			removeItem(head_o);
 		}
 				
@@ -208,7 +213,7 @@ public class WindowBuffer<T extends Writable> implements Writable {
 		while(cur != null) {
 			if (cur.val != null) {
 				for (int i = 0; i < cur.count; i++) {
-					ret.add(cur.val);
+					ret.add((T) cur.val);
 				}
 			}
 			
@@ -220,14 +225,52 @@ public class WindowBuffer<T extends Writable> implements Writable {
 	
 	@Override
 	public void write(DataOutput out) throws IOException {
-		// TODO Auto-generated method stub
+		// Write the max size.
+		out.writeInt(maxSize);
 		
+		// Write if the window is empty.
+		out.writeBoolean(cur_count > 0);
+
+		if (cur_count > 0) {
+			// The following only works if we have something in the window.
+			List<T> win = getWindow();			
+			
+			// Write the class name.
+			Class<? extends Writable> klass = win.get(0).getClass();
+			out.writeUTF(klass.getName());
+			
+			ArrayWritable aw = new ArrayWritable(klass, win.toArray(new Writable[0]));			
+		}
 	}
 
 	@Override
 	public void readFields(DataInput in) throws IOException {
-		// TODO Auto-generated method stub
+		// Read the max.
+		int max = in.readInt();
+		// Init
+		init(max);
 		
+		// Read to see if we have data.
+		boolean has_data = in.readBoolean();
+		if (has_data) {
+			// Pull the class name
+			String kn = in.readUTF();
+			// Instantiate it
+			Class<? extends Writable> klass;
+			try {
+				klass = (Class<? extends Writable>) Class.forName(kn);
+			} catch (ClassNotFoundException e) {
+				throw new RuntimeException(e);
+			}
+			
+			// Pull the array.
+			ArrayWritable aw = new ArrayWritable(klass);
+			aw.readFields(in);
+			
+			for (Writable o : aw.get()) {
+				push(o);
+			}	
+		}
 	}
 	
 	public String toString() {

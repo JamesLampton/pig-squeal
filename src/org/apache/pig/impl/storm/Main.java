@@ -184,47 +184,34 @@ public class Main {
 						);
 				
 				// Setup the aggregator.
-				if (sop.getWindowOptions() == null) {
-					// Use the CombineWrapper.
-					CombineWrapper agg = null;
-					if (sop.getType() == StormOper.OpType.BASIC_PERSIST) {
+				CombineWrapper agg = null;
+				if (sop.getType() == StormOper.OpType.BASIC_PERSIST) {
+					if (sop.getWindowOptions() == null) {
 						agg = new CombineWrapper(new TriBasicPersist());
-					} else {					
-						// We need to trim things from the plan re:PigCombiner.java
-						POPackage pack = (POPackage) sop.getPlan().getRoots().get(0);
-						sop.getPlan().remove(pack);
-
-						agg = new CombineWrapper(new TriCombinePersist(pack, sop.getPlan(), sop.mapKeyType)); 
+					} else {
+						// We'll be windowing things.
+						agg = new CombineWrapper(new TriWindowCombinePersist(sop.getWindowOptions()));
 					}
+				} else {					
+					// We need to trim things from the plan re:PigCombiner.java
+					POPackage pack = (POPackage) sop.getPlan().getRoots().get(0);
+					sop.getPlan().remove(pack);
 
-					// Group and aggregate
-					TridentState gr_persist = input.groupBy(group_key)
-							.persistentAggregate(
+					agg = new CombineWrapper(new TriCombinePersist(pack, sop.getPlan(), sop.mapKeyType)); 
+				}
+
+				// Group and aggregate
+				TridentState gr_persist = input.groupBy(group_key)
+						.persistentAggregate(
 								sop.getStateFactory(pc),
 								orig_input_fields,
 								agg, 
 								output_fields
-							);
-					if (sop.getParallelismHint() > 0) {
-						gr_persist.parallelismHint(sop.getParallelismHint());
-					}
-					output = gr_persist.newValuesStream();
-				} else {
-					// When windowing, we don't want to use any combiner logic.
-					// Group and aggregate
-					TridentState gr_persist = input.groupBy(group_key)
-							.persistentAggregate(
-								sop.getStateFactory(pc),
-								orig_input_fields,
-//								new ReduceWrapper(new TriWindowPersist(sop.getWindowOptions())), 
-								new CombineWrapper(new TriWindowCombinePersist(sop.getWindowOptions())), 
-								output_fields
-							);
-					if (sop.getParallelismHint() > 0) {
-						gr_persist.parallelismHint(sop.getParallelismHint());
-					}
-					output = gr_persist.newValuesStream();
+								);
+				if (sop.getParallelismHint() > 0) {
+					gr_persist.parallelismHint(sop.getParallelismHint());
 				}
+				output = gr_persist.newValuesStream();
 			
 				// Re-alias the raw as the key.
 				output = output.each(

@@ -131,45 +131,44 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapWritable> 
 		
 		return sb.toString();
 	}
+	
+	void mergeValues(MapWritable into, MapWritable from) {
+		for (Entry<Writable, Writable> ent : from.entrySet()) {
+			// See if this is a windowed element.
+			if (ent.getKey() instanceof IntWritable) {
+				// Pull the window.
+				WindowBuffer<NullableTuple> w = 
+						(WindowBuffer<NullableTuple>) into.get(ent.getKey());
+				
+				// Merge win2 in to w.
+				WindowBuffer<NullableTuple> w2 = (WindowBuffer<NullableTuple>) ent.getValue(); 
+				for (NullableTuple v : w2.getWindow()) {
+					w.push(v);
+				}
+				
+				continue;
+			}
+			
+			// Otherwise it's a tuple, merge it.
+			NullableTuple v = (NullableTuple) ent.getKey();
+			int c = ((IntWritable)ent.getValue()).get();
+			this.addTuple(into, v, c);
+		}
+	}
 
 	@Override
 	public MapWritable combine(MapWritable val1, MapWritable val2) {
-//		System.out.println("TriBasicPersist.combine -- ");
+//		System.out.println("TriWindowCombinePersist.combine -- ");
 //		System.out.println("val1 -- " + dumpToString(val1));
 //		System.out.println("val2 -- " + dumpToString(val2));
-
-		// This is written with the assumption that val1 comes from and to the 
-		// storage mechanism while val2 comes from init...
-		if (val1 == null) {
-			val1 = zero();
-		}
 		
-		// We're going to merge into val1
-		if (val2 != null) {
-			for (Entry<Writable, Writable> ent : val2.entrySet()) {
-				// See if this is a windowed element.
-				if (ent.getKey() instanceof IntWritable) {
-					// Pull the window.
-					WindowBuffer<NullableTuple> w = 
-							(WindowBuffer<NullableTuple>) val1.get(ent.getKey());
-					
-					// Merge win2 in to w.
-					WindowBuffer<NullableTuple> w2 = (WindowBuffer<NullableTuple>) ent.getValue(); 
-					for (NullableTuple v : w2.getWindow()) {
-						w.push(v);
-					}
-					
-					continue;
-				}
-				
-				// Otherwise it's a tuple, merge it.
-				NullableTuple v = (NullableTuple) ent.getKey();
-				int c = ((IntWritable)ent.getValue()).get();
-				this.addTuple(val1, v, c);
-			}
-		}
+		MapWritable ret = zero();
 		
-		return val1;
+		// Merge the values
+		mergeValues(ret, val1);
+		mergeValues(ret, val2);
+		
+		return ret;
 	}
 
 	@Override

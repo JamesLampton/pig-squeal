@@ -193,7 +193,7 @@ public class TestStream extends TestCase {
     	pig.registerQuery("stoplist3 = JOIN stoplist2 BY stopword2, stoplist BY stopword USING 'replicated';");
     	pig.registerQuery("stoplist3 = FOREACH stoplist3 GENERATE stopword2, stopword AS cheese;");
     	
-//    	pig.registerQuery("x = FILTER x BY $0 == 'the';");
+    	pig.registerQuery("x = FILTER x BY $0 == 'the';");
     	pig.registerQuery("words_sl3 = JOIN x BY word, stoplist BY stopword USING 'replicated';");
     	pig.registerQuery("words_sl3 = JOIN x BY word, stoplist3 BY stopword2;");
 //    	pig.registerQuery("words_sl3 = FOREACH words_sl3 GENERATE word;");
@@ -202,8 +202,9 @@ public class TestStream extends TestCase {
 //    	explain("words_simple_join");
     	props.setProperty("words_sl3_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"expiration\": 300, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
 //    	props.setProperty("words_sl3_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
+    	props.setProperty("words_sl3_window_opts", "{\"0\":2}");
 //    	explain("words_sl3");
-//    	pig.registerQuery("STORE words_sl3 INTO 'fake_path';");
+    	pig.registerQuery("STORE words_sl3 INTO 'fake_path';");
     	
 //    	pig.registerQuery("x = FILTER x BY $0 == 'the';");
 //    	pig.registerQuery("y = FILTER y BY $0 == 'the';");
@@ -270,7 +271,7 @@ public class TestStream extends TestCase {
     	pig.registerQuery("hist = FILTER hist BY freq > 0;");
 
 //    	explain("count");
-    	pig.registerQuery("STORE count INTO '/dev/null/1';");
+//    	pig.registerQuery("STORE count INTO '/dev/null/1';");
 //    	explain("hist");
 //    	pig.registerQuery("STORE hist INTO '/dev/null/1';");
     	

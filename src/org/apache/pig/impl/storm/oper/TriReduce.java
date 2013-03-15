@@ -187,6 +187,9 @@ public class TriReduce extends StormBaseFunction {
 		}
 		
 //		System.out.println("TriReduce |last_input|: " + ((tuples == null) ? 0 : tuples.size()) + " |last_output| : " + fc.last_res.size());
+//		if (tuples != null) {
+//			System.out.println("last_input: " + tuples);
+//		}
 //		System.out.println("last_output: " + fc.last_res);
 
 		// Calculate the current values.

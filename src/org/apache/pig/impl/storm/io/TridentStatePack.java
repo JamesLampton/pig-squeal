@@ -14,6 +14,7 @@ import org.apache.pig.impl.plan.OperatorKey;
 import org.apache.pig.impl.storm.oper.CombineWrapper;
 import org.apache.pig.impl.storm.oper.TriBasicPersist;
 import org.apache.pig.impl.storm.oper.TriReduce;
+import org.apache.pig.impl.storm.oper.TriWindowCombinePersist;
 
 import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Values;
@@ -48,10 +49,14 @@ public class TridentStatePack extends POPackage {
 			initialized = true;
 			s = (MapState) stateFactory.makeState(new HashMap(), 0, 1);
 			
-			agg = new CombineWrapper(new TriBasicPersist());
+			if (windowOpts == null) {
+				agg = new CombineWrapper(new TriBasicPersist());
+			} else {
+				agg = new CombineWrapper(new TriWindowCombinePersist(windowOpts));
+			}
 			tFactory = new TridentTupleView.FreshOutputFactory(new Fields("k", "v", "s"));
 			
-			System.out.println("TridentStatePack.attachInput initialized state: " + s + " agg: " + agg);
+			System.out.println("TridentStatePack.attachInput initialized state: " + s + " agg: " + agg + " windowOpts: " + windowOpts);
 		}
 
 		// Aggregate the values.

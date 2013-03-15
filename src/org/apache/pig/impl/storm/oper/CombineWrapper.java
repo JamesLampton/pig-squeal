@@ -57,7 +57,7 @@ public class CombineWrapper implements CombinerAggregator<MapWritable> {
 		return new MapWritable();		
 	}
 	
-	static Comparator<NullableTuple> NullableTupleComparator = new Comparator<NullableTuple>() {
+	public static Comparator<NullableTuple> NullableTupleComparator = new Comparator<NullableTuple>() {
 		@Override
 		public int compare(NullableTuple o1, NullableTuple o2) {
 			int res = o1.getIndex() - o2.getIndex();

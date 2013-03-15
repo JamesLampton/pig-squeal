@@ -232,10 +232,7 @@ public class StaticPlanFixer extends MROpPlanVisitor {
 		
 		// Oddly, MRToSConverter's getAlias returns null in this case...
 		String alias = mr.reducePlan.getLeaves().get(0).getAlias();
-		System.out.println("getAlias: " + MRtoSConverter.getAlias(mr.mapPlan, false) + " alias: " + alias);
-		
-		// Pull out the window option for this alias.
-		
+//		System.out.println("getAlias: " + MRtoSConverter.getAlias(mr.mapPlan, false) + " alias: " + alias);
 		
 		// TODO: Pass in specific combiner.
 		TridentStatePack pack = new TridentStatePack(

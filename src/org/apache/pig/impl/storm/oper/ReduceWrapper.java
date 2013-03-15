@@ -42,7 +42,7 @@ public class ReduceWrapper implements ReducerAggregator<MapWritable> {
 		ret = TriWindowPersist.getTuples((MapWritable)state);
 				
 		// Sort the tuples as the shuffle would.
-		Collections.sort(ret);
+		Collections.sort(ret, CombineWrapper.NullableTupleComparator);
 		
 		return ret;
 	}
