@@ -17,13 +17,11 @@ import storm.trident.tuple.TridentTuple;
 
 public class ReduceWrapper implements ReducerAggregator<MapWritable> {
 	private ReducerAggregator<Writable> agg;
-	private boolean disableLast;
 	static public final Text CUR = new Text("cur");
 	static public final Text LAST = new Text("last");
 	
-	public ReduceWrapper(ReducerAggregator agg, boolean disableLast) {
+	public ReduceWrapper(ReducerAggregator agg) {
 		this.agg = (ReducerAggregator<Writable>) agg;
-		this.disableLast= disableLast;
 	}
 
 	Writable getDefault(MapWritable v, Text k) {
@@ -61,7 +59,7 @@ public class ReduceWrapper implements ReducerAggregator<MapWritable> {
 		}
 		
 		// Setup LAST if we've been run before.
-		if (!disableLast && curr.get(CUR) != null) {
+		if (curr.get(CUR) != null) {
 			curr.put(LAST, curr.get(CUR));
 		}
 		

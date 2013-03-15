@@ -23,6 +23,7 @@ import org.apache.pig.impl.storm.oper.TriCombinePersist;
 import org.apache.pig.impl.storm.oper.TriMakePigTuples;
 import org.apache.pig.impl.storm.oper.TriMapFunc;
 import org.apache.pig.impl.storm.oper.TriReduce;
+import org.apache.pig.impl.storm.oper.TriWindowCombinePersist;
 import org.apache.pig.impl.storm.oper.TriWindowPersist;
 import org.apache.pig.impl.storm.plans.SOpPlanVisitor;
 import org.apache.pig.impl.storm.plans.SOperPlan;
@@ -215,7 +216,8 @@ public class Main {
 							.persistentAggregate(
 								sop.getStateFactory(pc),
 								orig_input_fields,
-								new ReduceWrapper(new TriWindowPersist(sop.getWindowOptions()), true), 
+//								new ReduceWrapper(new TriWindowPersist(sop.getWindowOptions())), 
+								new CombineWrapper(new TriWindowCombinePersist(sop.getWindowOptions())), 
 								output_fields
 							);
 					if (sop.getParallelismHint() > 0) {
@@ -223,7 +225,7 @@ public class Main {
 					}
 					output = gr_persist.newValuesStream();
 				}
-				
+			
 				// Re-alias the raw as the key.
 				output = output.each(
 							group_key,

@@ -155,6 +155,8 @@ public class WindowBuffer<T extends Writable> implements Writable {
 	}
 	
 	public void removeItem(T o) {
+		// FIXME: Handle removeItem for elements that have negative values before positive.
+		
 		// Get the head of the value list.
 		Element el = valMap.get(o);
 		

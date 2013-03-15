@@ -270,7 +270,7 @@ public class TestStream extends TestCase {
     	pig.registerQuery("hist = FILTER hist BY freq > 0;");
 
 //    	explain("count");
-//    	pig.registerQuery("STORE count INTO '/dev/null/1';");
+    	pig.registerQuery("STORE count INTO '/dev/null/1';");
 //    	explain("hist");
 //    	pig.registerQuery("STORE hist INTO '/dev/null/1';");
     	

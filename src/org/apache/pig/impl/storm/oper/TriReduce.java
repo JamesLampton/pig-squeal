@@ -145,6 +145,11 @@ public class TriReduce extends StormBaseFunction {
 				}
 			}
 			
+			// Don't emit negative messages for windowed messages.
+			if (windowedInput) {
+				return;
+			}
+			
 			// Any values in last_set go out as "negative" messages.
 			for (Entry<Writable, IntWritable>  ent: last_res.entrySet()) {
 				int count = ent.getValue().get();
@@ -182,6 +187,7 @@ public class TriReduce extends StormBaseFunction {
 		}
 		
 //		System.out.println("TriReduce |last_input|: " + ((tuples == null) ? 0 : tuples.size()) + " |last_output| : " + fc.last_res.size());
+//		System.out.println("last_output: " + fc.last_res);
 
 		// Calculate the current values.
 		if (windowedInput) {

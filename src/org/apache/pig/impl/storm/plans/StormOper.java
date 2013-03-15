@@ -128,4 +128,8 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 	public int getParallelismHint() {
 		return parallelismHint;
 	}
+
+	public static String getWindowOpts(PigContext pc, String alias) {
+		return pc.getProperties().getProperty(alias + "_window_opts");
+	}
 }

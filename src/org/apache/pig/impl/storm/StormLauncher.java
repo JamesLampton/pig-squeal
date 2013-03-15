@@ -136,7 +136,7 @@ public class StormLauncher extends Launcher {
 			log.info("Setting up the topology runner...");
 			Main m = new Main(pc, sp);
 			log.info("Launching!");
-//			m.launch();
+			m.launch();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

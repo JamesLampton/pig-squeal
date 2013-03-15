@@ -166,7 +166,7 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		StormOper po;
 		// See if we're a window.
 		String red_alias = (mr.combinePlan.size() > 0) ? getAlias(mr.combinePlan, false) : getAlias(mr.reducePlan, true);
-		String window_opts = pc.getProperties().getProperty(red_alias + "_window_opts");
+		String window_opts = StormOper.getWindowOpts(pc, red_alias); 
 //		System.out.println("RED_ALIAS: " + red_alias + " window_opts: " + window_opts);
 		if (mr.combinePlan.size() == 0 || window_opts != null) {
 			// Basic reduce or windowed group operator.

@@ -33,11 +33,13 @@ public class TridentStatePack extends POPackage {
 	MapState s;
 	CombinerAggregator agg;
 	TridentTupleView.FreshOutputFactory tFactory;
+	private String windowOpts;
 	private final static Integer POS = 1;
 	
-	public TridentStatePack(OperatorKey k, StateFactory stateFactory) {
+	public TridentStatePack(OperatorKey k, StateFactory stateFactory, String windowOpts) {
 		super(k);
 		this.stateFactory = stateFactory;
+		this.windowOpts = windowOpts;
 	}
 	
 	@Override
@@ -45,6 +47,7 @@ public class TridentStatePack extends POPackage {
 		if (initialized == false) {
 			initialized = true;
 			s = (MapState) stateFactory.makeState(new HashMap(), 0, 1);
+			
 			agg = new CombineWrapper(new TriBasicPersist());
 			tFactory = new TridentTupleView.FreshOutputFactory(new Fields("k", "v", "s"));
 			
