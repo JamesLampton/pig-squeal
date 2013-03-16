@@ -239,7 +239,8 @@ public class WindowBuffer<T extends Writable> implements Writable {
 			Class<? extends Writable> klass = win.get(0).getClass();
 			out.writeUTF(klass.getName());
 			
-			ArrayWritable aw = new ArrayWritable(klass, win.toArray(new Writable[0]));			
+			ArrayWritable aw = new ArrayWritable(klass, win.toArray(new Writable[0]));
+			aw.write(out);
 		}
 	}
 

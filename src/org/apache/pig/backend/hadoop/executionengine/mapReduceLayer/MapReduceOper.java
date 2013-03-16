@@ -455,6 +455,10 @@ public class MapReduceOper extends Operator<MROpPlanVisitor> {
         return requestedParallelism;
     }
     
+    public void setRequestedParallelism(int rp) {
+        requestedParallelism = rp;
+    }
+    
     public String getCustomPartitioner() {
     	return customPartitioner;
     }

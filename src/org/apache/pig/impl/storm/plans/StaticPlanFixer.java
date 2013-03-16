@@ -38,6 +38,10 @@ import org.apache.pig.impl.storm.io.SpoutWrapper;
 import org.apache.pig.impl.storm.io.TridentStatePack;
 import org.apache.pig.impl.util.MultiMap;
 
+import backtype.storm.tuple.Values;
+
+import storm.trident.state.StateFactory;
+
 /**
  * The purpose of this class is to find static elements within the MapReduce
  * plan and to execute Hadoop jobs to place the appropriate data into the
@@ -211,6 +215,8 @@ public class StaticPlanFixer extends MROpPlanVisitor {
 		// We're going to create a new operator to stash the results from the static tree.
 		String scope = mr.getOperatorKey().getScope();
 		MapReduceOper state_mr = new MapReduceOper(new OperatorKey(scope, NodeIdGenerator.getGenerator().getNextNodeId(scope)));
+		state_mr.setRequestedParallelism(mr.getRequestedParallelism());
+//		System.out.println("StaticPlanFixer ---------------->" + state_mr.getRequestedParallelism() + " " + mr.getRequestedParallelism() + " " + mr.name());
 
 		// Clone the Map plan from mr.
 		MultiMap<PhysicalOperator, PhysicalOperator> opmap = new MultiMap<PhysicalOperator, PhysicalOperator>();
@@ -234,13 +240,24 @@ public class StaticPlanFixer extends MROpPlanVisitor {
 		String alias = mr.reducePlan.getLeaves().get(0).getAlias();
 //		System.out.println("getAlias: " + MRtoSConverter.getAlias(mr.mapPlan, false) + " alias: " + alias);
 		
-		// TODO: Pass in specific combiner.
+		// Pull the state factory.
+		StateFactory sf = StormOper.getStateFactory(pc, alias);
+		
 		TridentStatePack pack = new TridentStatePack(
 				new OperatorKey(scope, NodeIdGenerator.getGenerator().getNextNodeId(scope)),
-				StormOper.getStateFactory(pc, alias), StormOper.getWindowOpts(pc, alias));
+				sf, StormOper.getWindowOpts(pc, alias));
 		pack.setKeyType(mr.mapKeyType);
 		state_mr.reducePlan.add(pack);
 		
+		// Clone the necessary UDFs.
+		state_mr.UDFs.addAll(mr.UDFs);
+		state_mr.UDFs.add(sf.getClass().getName());
+		
+		// Register a "storm UDF" so it gets packaged too.
+		state_mr.UDFs.add(Values.class.getName());
+		// FIXME: Fix the stupid ivy dependencies?
+		state_mr.UDFs.add("clojure.lang.IPersistentVector");
+				
 		// Add the dependencies to using the static preds.
 		staticPlan.add(state_mr);
 		for (MapReduceOper pre : static_preds) {

@@ -2,6 +2,11 @@ package org.apache.pig.test.storm;
 
 import static org.junit.Assert.*;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+
 import org.apache.hadoop.io.IntWritable;
 import org.apache.pig.impl.storm.state.WindowBuffer;
 import org.junit.Test;
@@ -70,5 +75,33 @@ public class TestWindowStruct {
 			// Pull the window and check the sum.
 			assertEquals(cur_sum, getTestSum(tw));
 		}
+	}
+	
+	@Test
+    public void testSerDe() throws Exception {
+		WindowBuffer<IntWritable> tw = new WindowBuffer<IntWritable>(10);
+		tw.push(new IntWritable(1));
+		tw.push(new IntWritable(2));
+		tw.push(new IntWritable(3));
+		tw.push(new IntWritable(4));
+		tw.push(new IntWritable(2));
+		
+		// Check the sum.
+		assertEquals(12, getTestSum(tw));
+		
+		// Write the values out.
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		DataOutputStream dos = new DataOutputStream(baos);
+		tw.write(dos);
+		dos.close();
+				
+		// Read them back in.
+		tw = new WindowBuffer<IntWritable>();
+		ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+		DataInputStream dis = new DataInputStream(bais);
+		tw.readFields(dis);
+
+		// Check the sum.
+		assertEquals(12, getTestSum(tw));
 	}
 }

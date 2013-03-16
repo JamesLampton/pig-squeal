@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.Map.Entry;
 import java.util.jar.JarOutputStream;
@@ -87,6 +88,14 @@ public class StormLauncher extends Launcher {
 			// beyond this window, so we will move all the temp files to a new location.
 			if (sp.getReplFileMap() != null) {
 				DataStorage dfs = pc.getDfs();
+
+				// Make the base directory in the ugliest way possible.
+				FileSpec a_spec = (FileSpec) sp.getReplFileMap().values().toArray()[0];
+				ElementDescriptor tmp = dfs.asElement(a_spec.getFileName());
+				OutputStream tmp_fh = tmp.create();
+				tmp_fh.close();
+				tmp.delete();
+
 				for (Entry<FileSpec, FileSpec> ent : sp.getReplFileMap().entrySet()) {
 					log.info("Moving " + ent.getKey() + " to " + ent.getValue());
 					ElementDescriptor fn_from = dfs.asElement(ent.getKey().getFileName());
@@ -136,7 +145,7 @@ public class StormLauncher extends Launcher {
 			log.info("Setting up the topology runner...");
 			Main m = new Main(pc, sp);
 			log.info("Launching!");
-			m.launch();
+//			m.launch();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
