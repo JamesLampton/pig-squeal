@@ -73,7 +73,7 @@ public class SpoutWrapper extends LoadFunc implements LoadMetadata, LoadCaster {
 	public IRichSpout getSpout() {
 		try {
 			Class<?> cls = PigContext.getClassLoader().loadClass(spoutClass);
-			if (jsonArgs != null) {
+			if (jsonArgs != null && jsonArgs.length() > 0) {
 				Object o[] = (Object[]) JSON.parse(jsonArgs);
 				Class<?> cls_arr[] = new Class<?>[o.length];
 				for (int i = 0; i < o.length; i++) {

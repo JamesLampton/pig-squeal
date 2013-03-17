@@ -4,8 +4,10 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -48,6 +50,7 @@ public class Main {
 	SOperPlan splan;
 	private TridentTopology t;
 	private static final Log log = LogFactory.getLog(Main.class);
+	private Set<StormOper> leaves;
 	
 	public Main() {
 		this(null, null);
@@ -108,7 +111,7 @@ public class Main {
 //				System.out.println("processMapSOP -- input: " + input + " " + input_sop + " " + po);
 				output = input.each(
 							input.getOutputFields(),
-							new TriMapFunc(pc, clonePlan, sop.mapKeyType, sop.getIsCombined(), cloneActiveRoot),
+							new TriMapFunc(pc, clonePlan, sop.mapKeyType, sop.getIsCombined(), cloneActiveRoot, leaves.contains(sop)),
 							output_fields
 						).project(output_fields);
 				outputs.add(output);
@@ -227,10 +230,10 @@ public class Main {
 				// Need to reduce
 				output = input.each(
 							input.getOutputFields(), 
-							new TriReduce(pc, sop.getPlan(), (sop.getWindowOptions() == null ? false : true)), 
+							new TriReduce(pc, sop.getPlan(), (sop.getWindowOptions() == null ? false : true), leaves.contains(sop)), 
 							output_fields
 						).project(output_fields);
-				output.each(output.getOutputFields(), new Debug());
+//				output.each(output.getOutputFields(), new Debug());
 			}
 			
 			sop_streams.put(sop, output);
@@ -242,6 +245,9 @@ public class Main {
 	
 	public TridentTopology setupTopology(PigContext pc) {
 		TridentTopology topology = new TridentTopology();
+		
+		// Pull out the leaves to handle storage.
+		leaves = new HashSet<StormOper>(splan.getLeaves());
 		
 		// Walk the plan and create the topology.
 		DepWalker w = new DepWalker(topology, splan, pc);

@@ -3,18 +3,23 @@ package org.apache.pig.impl.storm.oper;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.pig.PigException;
 import org.apache.pig.backend.executionengine.ExecException;
 import org.apache.pig.backend.hadoop.HDataType;
+import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.MapReducePOStoreImpl;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.POStatus;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.PhysicalOperator;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.Result;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhysicalPlan;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLocalRearrange;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.util.PlanHelper;
 import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.data.TupleFactory;
@@ -22,6 +27,8 @@ import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.io.PigNullableWritable;
 import org.apache.pig.impl.plan.PlanException;
+import org.apache.pig.impl.plan.VisitorException;
+import org.apache.pig.impl.storm.io.StormPOStoreImpl;
 import org.apache.pig.impl.storm.plans.CombineInverter;
 import org.apache.pig.impl.util.MultiMap;
 
@@ -29,6 +36,7 @@ import backtype.storm.tuple.Values;
 
 import storm.trident.operation.BaseFunction;
 import storm.trident.operation.TridentCollector;
+import storm.trident.operation.TridentOperationContext;
 import storm.trident.tuple.TridentTuple;
 
 public class TriMapFunc extends StormBaseFunction {
@@ -36,6 +44,38 @@ public class TriMapFunc extends StormBaseFunction {
 	private static final Tuple DUMMYTUPLE = null;
 	private PlanExecutor mapPlanExecutor;
 	private PlanExecutor negMapPlanExecutor = null;
+	private boolean isLeaf;
+	
+	@Override
+	public void	prepare(Map conf, TridentOperationContext context) {
+		super.prepare(conf, context);
+		
+		// Initialize any stores.
+//		System.out.println("TriMapFunc.prepare -- conf: " + conf);
+//		System.out.println("TriMapFunc.prepare -- context: " + context.getPartitionIndex());
+		
+		if (isLeaf) {
+			try {
+				mapPlanExecutor.setup((String) conf.get("storm.id"), context.getPartitionIndex());
+				negMapPlanExecutor.setup((String) conf.get("storm.id"), context.getPartitionIndex());
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		}
+	}
+	
+	@Override
+	public void cleanup() {
+		super.cleanup();
+		
+		if (isLeaf) {
+			try {
+				mapPlanExecutor.teardown();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		}
+	}
 	
 	class PlanExecutor implements Serializable {
 		private PhysicalOperator leaf;
@@ -43,20 +83,45 @@ public class TriMapFunc extends StormBaseFunction {
 		private byte mapKeyType;
 		private boolean errorInMap;
 		private PhysicalOperator root;
+		private LinkedList<POStore> stores;
+		private AtomicInteger sign;
 
-		protected PlanExecutor(PhysicalPlan plan, byte mapKeyType, PhysicalOperator root) {
+		protected PlanExecutor(PhysicalPlan plan, byte mapKeyType, PhysicalOperator root, int sign) {
 			this.root = root;
-			
+			this.sign = new AtomicInteger(sign);
+						
 			leaf = plan.getLeaves().get(0);
 			if (leaf.getClass().isAssignableFrom(POStore.class)) {
-				// We need to actually peel the POStore off.
-				leaf = plan.getPredecessors(leaf).get(0);
+				if (!isLeaf) {
+					// We need to actually peel the POStore off.
+					leaf = plan.getPredecessors(leaf).get(0);
+				}
 			} else {
 				computeKey = true;
 			}
 			this.mapKeyType = mapKeyType;
+			
+			try {
+				stores = PlanHelper.getStores(plan);
+			} catch (VisitorException e) {
+				throw new RuntimeException(e);
+			}
 		}
 		
+		public void teardown() throws IOException {
+			for (POStore store : stores) {
+				store.tearDown();
+			}
+		}
+
+		public void setup(String stormId, int partitionIndex) throws IOException {
+			for (POStore store : stores) {
+				StormPOStoreImpl impl = new StormPOStoreImpl(stormId, partitionIndex, sign);
+				store.setStoreImpl(impl);
+				store.setUp();
+			}
+		}
+
 		public void execute(TridentTuple tuple, TridentCollector collector, Integer tive) {
 			// Bind the tuple.
 			root.attachInput((Tuple) ((PigNullableWritable) tuple.get(1)).getValueAsPigType());
@@ -130,8 +195,12 @@ public class TriMapFunc extends StormBaseFunction {
 		}
 	}
 
-	public TriMapFunc(PigContext pc, PhysicalPlan physicalPlan, byte mapKeyType, boolean isCombined, PhysicalOperator activeRoot) {
+	public TriMapFunc(PigContext pc, PhysicalPlan physicalPlan, byte mapKeyType, boolean isCombined, PhysicalOperator activeRoot, boolean isLeaf) {
 		super(pc);
+		
+		// Set this variable to determine if the store leaves are removed.
+		this.isLeaf = isLeaf;
+		
 		// Pull out the active root and get the predecessor.
 		List<PhysicalOperator> roots = physicalPlan.getSuccessors(activeRoot);
 		if (roots.size() > 1) {
@@ -147,7 +216,7 @@ public class TriMapFunc extends StormBaseFunction {
 			physicalPlan.remove(pl);
 		}
 
-		mapPlanExecutor = new PlanExecutor(physicalPlan, mapKeyType, activeRoot);
+		mapPlanExecutor = new PlanExecutor(physicalPlan, mapKeyType, activeRoot, 1);
 		
 		PhysicalPlan negClone;
 		MultiMap<PhysicalOperator, PhysicalOperator> opmap;
@@ -173,7 +242,7 @@ public class TriMapFunc extends StormBaseFunction {
 		}
 		// track activeRoot through the clone.
 		PhysicalOperator negActiveRoot = opmap.get(activeRoot).get(0);
-		negMapPlanExecutor  = new PlanExecutor(negClone, mapKeyType, negActiveRoot);
+		negMapPlanExecutor  = new PlanExecutor(negClone, mapKeyType, negActiveRoot, -1);
 	}
 	
 	@Override

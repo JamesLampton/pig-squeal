@@ -222,20 +222,28 @@ public class TestStream extends TestCase {
     	stopfile.delete();
     }
     
+    void registerStore(String alias, String path) throws Exception {
+    	pig.deleteFile(path);
+    	pig.registerQuery("STORE " + alias + " INTO '" + path + "' USING org.apache.pig.impl.storm.io.SignStoreWrapper('org.apache.pig.impl.storm.io.DebugOutput');");
+    }
+    
     @Test
     public void testWCHist () throws Exception {
+    	String output = "/tmp/testWCHist";
+    	pig.deleteFile(output);
+    	
     	// storm.trident.testing.FixedBatchSpout
     	// backtype.storm.testing.FixedTupleSpout
     	pig.registerQuery("x = LOAD '/dev/null' USING " +
     			"org.apache.pig.impl.storm.io.SpoutWrapper(" +
-    				"'org.apache.pig.test.storm.TestSentenceSpout') AS (sentence:chararray);");
+    				"'org.apache.pig.test.storm.TestSentenceSpout', '', '3') AS (sentence:chararray);");
 
     	// STREAM is asynchronous is how it returns results, we don't have enough to make it work in this case.
 //    	pig.registerQuery("x = STREAM x THROUGH `tr -d '[:punct:]'` AS (sentence:chararray);");
 
     	pig.registerQuery("x = FOREACH x GENERATE FLATTEN(TOKENIZE(sentence));");
     	pig.registerQuery("x = FOREACH x GENERATE LOWER($0) AS word;");
-    	
+
 //    	props.setProperty("count_gr_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"expiration\": 300, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
 //    	props.setProperty("count_gr_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"serializer\":\"org.apache.pig.impl.storm.state.PigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
     	pig.registerQuery("count_gr = GROUP x BY word;");
@@ -245,15 +253,11 @@ public class TestStream extends TestCase {
     	pig.registerQuery("hist_gr = GROUP count BY wc;");
     	pig.registerQuery("hist = FOREACH hist_gr GENERATE group AS wc, COUNT(count) AS freq;");
     	pig.registerQuery("hist = FILTER hist BY freq > 0;");
-    	
-    	pig.registerQuery("q = GROUP x BY 1;");
-    	pig.registerQuery("c = FOREACH q GENERATE COUNT(x);");
-//    	pig.registerQuery("STORE c INTO '/dev/null/1';");
-    	
-//    	pig.registerQuery("STORE hist INTO '/dev/null/1';");
-//    	pig.registerQuery("STORE x INTO '/dev/null/1';");
-//    	pig.registerQuery("STORE count_gr INTO '/dev/null/1';");
-//    	pig.registerQuery("STORE count INTO '/dev/null/1';");
+    	    	
+    	registerStore("hist", output);
+//    	registerStore("x", output);
+//    	registerStore("count_gr", output);
+//    	registerStore("count", output);
     	
 //    	explain("hist");
     }

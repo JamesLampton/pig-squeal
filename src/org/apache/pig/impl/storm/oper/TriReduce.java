@@ -3,9 +3,12 @@ package org.apache.pig.impl.storm.oper;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.MapWritable;
@@ -21,16 +24,20 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.Physica
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POJoinPackage;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POPackage;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.util.PlanHelper;
 import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.io.PigNullableWritable;
+import org.apache.pig.impl.plan.VisitorException;
+import org.apache.pig.impl.storm.io.StormPOStoreImpl;
 
 import backtype.storm.tuple.Values;
 
 import storm.trident.operation.BaseFunction;
 import storm.trident.operation.TridentCollector;
+import storm.trident.operation.TridentOperationContext;
 import storm.trident.tuple.TridentTuple;
 
 public class TriReduce extends StormBaseFunction {
@@ -41,15 +48,49 @@ public class TriReduce extends StormBaseFunction {
 	private POPackage pack;
 	private boolean errorInReduce;
 	private boolean windowedInput;
+	private boolean isLeaf;
+	private LinkedList<POStore> stores;
+	private AtomicInteger sign;
 	private final static Tuple DUMMYTUPLE = null;
 	private final static PhysicalOperator[] DUMMYROOTARR = {};
 	private final static Integer POS = 1;
 	private final static Integer NEG = -1;
 	
-	public TriReduce(PigContext pc, PhysicalPlan plan, boolean windowedInput) {
+	public void teardown() throws IOException {
+		for (POStore store : stores) {
+			store.tearDown();
+		}
+	}
+
+	public void setup(String stormId, int partitionIndex) throws IOException {
+		for (POStore store : stores) {
+			StormPOStoreImpl impl = new StormPOStoreImpl(stormId, partitionIndex, sign);
+			store.setStoreImpl(impl);
+			store.setUp();
+		}
+	}
+	
+	@Override
+	public void	prepare(Map conf, TridentOperationContext context) {
+		super.prepare(conf, context);
+		
+		// Initialize any stores.
+		if (isLeaf) {
+			try {
+				setup((String) conf.get("storm.id"), context.getPartitionIndex());
+				// TODO: -- handle the negative stuff too.
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		}
+	}
+	
+	public TriReduce(PigContext pc, PhysicalPlan plan, boolean windowedInput, boolean isLeaf) {
 		super(pc);
 		
 		this.windowedInput = windowedInput;
+		this.isLeaf = isLeaf;
+		this.sign = new AtomicInteger(0);
 		
 		// We need to trim things from the plan re:GenericMapReduce.java
 		reducePlan = plan;
@@ -61,11 +102,18 @@ public class TriReduce extends StormBaseFunction {
 		leaf = plan.getLeaves().get(0);
 //		System.out.println("TriReduce roots: " + roots + " leaf: " + leaf + " isEmpty: " + reducePlan.isEmpty());
 		if (leaf.getClass().isAssignableFrom(POStore.class)) {
+			if (isLeaf) {
+				try {
+					stores = PlanHelper.getStores(plan);
+				} catch (VisitorException e) {
+					throw new RuntimeException(e);
+				}	
+			}
+			
 			// We need to actually peel the POStore off.
 			if (reducePlan.getPredecessors(leaf) != null) {
 				leaf = reducePlan.getPredecessors(leaf).get(0);
 			} else {
-//				System.out.println("Leaf is null!");
 				leaf = null;
 			}
 		}
@@ -129,21 +177,39 @@ public class TriReduce extends StormBaseFunction {
 			collector.reportError(t);
 		}
 		
-		// Emit positive and negative messages.
-		public void emitValues() {
-			// Any values in cur_set go out as "positive" messages.
-			for (Entry<Writable, IntWritable>  ent: cur_res.entrySet()) {
+		void emitSet(Set<Entry<Writable, IntWritable>> s, Integer msign) {
+			for (Entry<Writable, IntWritable>  ent: s) {
 				int count = ent.getValue().get();
 //				System.err.println("Pos: " + ent);
 				for (int i = 0; i < count ; i++) {
 					byte t = DataType.findType(ent.getKey());
 					try {
-						collector.emit(new Values(null, HDataType.getWritableComparableTypes(ent.getKey(), t), POS));
+						// Emit to the STORE function if we're a leaf.
+						if (isLeaf) {
+							// Set the sign reference appropriately.
+							sign.set(msign);
+							// Attach the input to the store function and empty it.
+							for (POStore store : stores) {
+//								System.out.println("emitSet: " + ent.getKey());
+								Tuple tup = (Tuple) ent.getKey();
+								store.attachInput(tup);
+								store.getNext(DUMMYTUPLE);
+							}
+						}
+												
+						// Emit to the stream.
+						collector.emit(new Values(null, HDataType.getWritableComparableTypes(ent.getKey(), t), msign));
 					} catch (ExecException e) {
 						throw new RuntimeException(e);
 					}
 				}
 			}
+		}
+		
+		// Emit positive and negative messages.
+		public void emitValues() {
+			// Any values in cur_set go out as "positive" messages.
+			emitSet(cur_res.entrySet(), POS);
 			
 			// Don't emit negative messages for windowed messages.
 			if (windowedInput) {
@@ -151,18 +217,7 @@ public class TriReduce extends StormBaseFunction {
 			}
 			
 			// Any values in last_set go out as "negative" messages.
-			for (Entry<Writable, IntWritable>  ent: last_res.entrySet()) {
-				int count = ent.getValue().get();
-//				System.err.println("Neg: " + ent);
-				for (int i = 0; i < count ; i++) {
-					byte t = DataType.findType(ent.getKey());
-					try {
-						collector.emit(new Values(null, HDataType.getWritableComparableTypes(ent.getKey(), t), NEG));
-					} catch (ExecException e) {
-						throw new RuntimeException(e);
-					}
-				}
-			}
+			emitSet(last_res.entrySet(), NEG);
 		}
 	}
 	
