@@ -34,7 +34,7 @@ public class StateWrapper {
 	
 	public StateFactory getStateFactory() {
 		if (stateFactoryCN == null) {
-			return new LRUMemoryMapState.Factory(10000);
+			return new LRUMemoryMapState.Factory(5000);
 		}
 		
 		try {

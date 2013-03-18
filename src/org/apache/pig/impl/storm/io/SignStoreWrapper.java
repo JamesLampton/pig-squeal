@@ -43,6 +43,10 @@ public class SignStoreWrapper implements StoreFuncInterface {
 		}
 	}
 	
+	public String getWrappedClass() {
+		return storeClass;
+	}
+	
 	@Override
 	public String relToAbsPathForStoreLocation(String location, Path curDir)
 			throws IOException {

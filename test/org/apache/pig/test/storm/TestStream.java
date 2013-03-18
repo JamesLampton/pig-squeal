@@ -159,6 +159,8 @@ public class TestStream extends TestCase {
     
     @Test
     public void testJoin() throws Exception {
+    	String output = "/tmp/testJoin";
+    	
     	// Create the input file ourselves.
     	File stopfile = new File(STOPWORDS_FILE);
 //    	System.out.println("f:" + stopfile.getAbsolutePath());
@@ -186,7 +188,7 @@ public class TestStream extends TestCase {
     	
     	pig.registerQuery("wordsr = JOIN x BY word, stoplist BY stopword USING 'replicated';");
 //    	explain("wordsr");
-//    	pig.registerQuery("STORE wordsr INTO 'fake_path';");
+//    	registerStore("wordsr", output);
 
     	// Tests for mixed static/dynamic stuff.
     	pig.registerQuery("stoplist2 = LOAD '" + STOPWORDS_FILE + "' AS (stopword2:chararray);");
@@ -196,6 +198,7 @@ public class TestStream extends TestCase {
     	pig.registerQuery("x = FILTER x BY $0 == 'the';");
 //    	pig.registerQuery("words_sl3 = JOIN x BY word, stoplist BY stopword USING 'replicated';");
     	pig.registerQuery("words_sl3 = JOIN x BY word, stoplist3 BY stopword2;");
+    	pig.registerQuery("words_sl3_fe = FOREACH words_sl3 GENERATE word;");
 
 //    	pig.registerQuery("words_sl3 = FOREACH words_sl3 GENERATE word;");
 //    	pig.registerQuery("words_sl3_2 = JOIN words_sl3 BY word, stoplist3 BY stopword;");
@@ -204,15 +207,16 @@ public class TestStream extends TestCase {
     	props.setProperty("words_sl3_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"expiration\": 300, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
 //    	props.setProperty("words_sl3_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
     	props.setProperty("words_sl3_window_opts", "{\"0\":2}");
-//    	explain("words_sl3");
-//    	pig.registerQuery("STORE words_sl3 INTO 'fake_path';");
+    	explain("words_sl3_fe");
+//    	registerStore("words_sl3", output);
+
     	
 //    	pig.registerQuery("x = FILTER x BY $0 == 'the';");
 //    	pig.registerQuery("y = FILTER y BY $0 == 'the';");
     	pig.registerQuery("silly = JOIN x BY word, y BY word;");
-//    	pig.registerQuery("STORE x INTO 'fake_path';");
+//    	registerStore("x", output);
 //    	explain("silly");    	
-//    	pig.registerQuery("STORE silly INTO 'fake_path';");
+//    	registerStore("silly", output);
 
     	
     	// Test Parallelism for static jobs. FIXME: I think this requires minicluster.
@@ -230,7 +234,6 @@ public class TestStream extends TestCase {
     @Test
     public void testWCHist () throws Exception {
     	String output = "/tmp/testWCHist";
-    	pig.deleteFile(output);
     	
     	// storm.trident.testing.FixedBatchSpout
     	// backtype.storm.testing.FixedTupleSpout

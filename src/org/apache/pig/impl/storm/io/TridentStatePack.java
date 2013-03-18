@@ -56,7 +56,7 @@ public class TridentStatePack extends POPackage {
 			}
 			tFactory = new TridentTupleView.FreshOutputFactory(new Fields("k", "v", "s"));
 			
-			System.out.println("TridentStatePack.attachInput initialized state: " + s + " agg: " + agg + " windowOpts: " + windowOpts);
+			System.out.println("TridentStatePack.attachInput initialized state: " + stateFactory + " agg: " + agg + " windowOpts: " + windowOpts);
 		}
 
 		// Aggregate the values.

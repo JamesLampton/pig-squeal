@@ -3,6 +3,7 @@ package org.apache.pig.impl.storm.plans;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,6 +20,8 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOpe
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLocalRearrange;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POUnion;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.util.PlanHelper;
 import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.io.FileSpec;
 import org.apache.pig.impl.plan.DependencyOrderWalker;
@@ -29,6 +32,7 @@ import org.apache.pig.impl.plan.PlanException;
 import org.apache.pig.impl.plan.PlanWalker;
 import org.apache.pig.impl.plan.VisitorException;
 import org.apache.pig.impl.storm.io.NOPLoad;
+import org.apache.pig.impl.storm.io.SignStoreWrapper;
 import org.apache.pig.impl.storm.io.SpoutWrapper;
 
 public class MRtoSConverter extends MROpPlanVisitor {
@@ -88,12 +92,36 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		String alias = leaf.getAlias();
 		if (leaf instanceof POStore) {
 			leaf = p.getPredecessors(leaf).get(0);
+		} else if (leaf instanceof POUnion) {
+			leaf = ((POUnion) leaf).getInputs().get(0);
 		}
 		return (leaf == null || leaf.getAlias() == null) ? alias : leaf.getAlias();
 	}
 	
+	public void updateUDFs(PhysicalPlan plan) {		
+		try {
+			for (POStore store : PlanHelper.getStores(plan)) {
+				if (store.getStoreFunc() instanceof SignStoreWrapper) {
+					SignStoreWrapper sf = (SignStoreWrapper) store.getStoreFunc();
+					splan.UDFs.add(sf.getWrappedClass());
+				}
+			}
+		
+			for (POLoad load : PlanHelper.getLoads(plan)) {
+				if (load.getLoadFunc() instanceof SpoutWrapper) {
+					SpoutWrapper lf = (SpoutWrapper) load.getLoadFunc();
+					// Add the spout's UDF so it gets picked up by the Jar.
+					splan.UDFs.add(lf.getSpoutClass());
+				}
+			}
+		} catch (VisitorException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
 	public void visitMROp(MapReduceOper mr) throws VisitorException {
 		splan.UDFs.addAll(mr.UDFs);
+		updateUDFs(mr.mapPlan);
 		
 		new PhyPlanSetter(mr.mapPlan).visit();
         new PhyPlanSetter(mr.reducePlan).visit();
@@ -126,9 +154,6 @@ public class MRtoSConverter extends MROpPlanVisitor {
 				splan.add(spout);
 				splan.addPLSpoutLink(spout, pl);
 				rootMap.put(fn, spout);
-
-				// Add the spout's UDF so it gets picked up by the Jar.
-				splan.UDFs.add(sw.getSpoutClass());
 			}
 			
 			if (rootMap.containsKey(fn)) {
@@ -165,7 +190,13 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		// Persist SOP
 		StormOper po;
 		// See if we're a window.
-		String red_alias = (mr.combinePlan.size() > 0) ? getAlias(mr.combinePlan, false) : getAlias(mr.reducePlan, true);
+		String red_alias;
+		if (mr.reducePlan.getRoots().get(0) instanceof POJoinPackage) {
+			red_alias = getAlias(mr.mapPlan, false);
+		} else {
+			red_alias = (mr.combinePlan.size() > 0) ? getAlias(mr.combinePlan, false) : getAlias(mr.reducePlan, true);
+		}
+		
 		String window_opts = StormOper.getWindowOpts(pc, red_alias); 
 //		System.out.println("RED_ALIAS: " + red_alias + " window_opts: " + window_opts);
 		if (mr.combinePlan.size() == 0 || window_opts != null) {

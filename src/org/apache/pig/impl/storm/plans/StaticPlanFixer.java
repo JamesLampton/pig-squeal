@@ -22,6 +22,7 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOpe
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLocalRearrange;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POUnion;
 import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.io.FileSpec;
 import org.apache.pig.impl.plan.DependencyOrderWalker;
@@ -237,11 +238,15 @@ public class StaticPlanFixer extends MROpPlanVisitor {
 		state_mr.reducePlan = new PhysicalPlan();
 		
 		// Oddly, MRToSConverter's getAlias returns null in this case...
-		String alias = mr.reducePlan.getLeaves().get(0).getAlias();
-//		System.out.println("getAlias: " + MRtoSConverter.getAlias(mr.mapPlan, false) + " alias: " + alias);
+		POUnion union = (POUnion) mr.mapPlan.getLeaves().get(0);
+		String alias = union.getInputs().get(0).getAlias();
+//		String alias = mr.reducePlan.getLeaves().get(0).getAlias();
 		
 		// Pull the state factory.
 		StateFactory sf = StormOper.getStateFactory(pc, alias);
+//		System.out.println("StaticPlanFixer.getAlias: " + MRtoSConverter.getAlias(mr.mapPlan, false) + " alias: " + alias + " sf: " + sf);
+//		System.out.println("MapPlan: " + mr.mapPlan);
+//		System.out.println("ReducePlan: " + mr.reducePlan);
 		
 		TridentStatePack pack = new TridentStatePack(
 				new OperatorKey(scope, NodeIdGenerator.getGenerator().getNextNodeId(scope)),
