@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.fs.Path;
@@ -16,12 +17,12 @@ import org.apache.pig.data.Tuple;
 import org.apache.pig.data.TupleFactory;
 import org.apache.pig.impl.PigContext;
 
-public class SignStoreWrapper implements StoreFuncInterface {
+public class SignStoreWrapper implements StoreFuncInterface, ISignStore {
 
-	private String storeClass;
-	private StoreFuncInterface wrapped;
-	private AtomicInteger sign;
-	private TupleFactory mTupleFactory = TupleFactory.getInstance();
+	protected String storeClass;
+	protected StoreFuncInterface wrapped;
+	protected AtomicInteger sign;
+	protected TupleFactory mTupleFactory = TupleFactory.getInstance();
 
 	public SignStoreWrapper(String[] args) {
 		storeClass = args[0];
@@ -43,8 +44,10 @@ public class SignStoreWrapper implements StoreFuncInterface {
 		}
 	}
 	
-	public String getWrappedClass() {
-		return storeClass;
+	public List<String> getUDFs() {
+		ArrayList<String> ret = new ArrayList<String>();
+		ret.add(storeClass);
+		return ret;
 	}
 	
 	@Override

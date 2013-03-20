@@ -73,8 +73,7 @@ public class StormLauncher extends Launcher {
 		SOperPlan sp = compile(php, pc);
 		
 		// If there is a static portion portion, execute it now.
-		// TODO: Put this back.
-		if (true && sp.getStaticPlan() != null) {
+		if (!pc.getProperties().getProperty("pig.streaming.no.static", "false").equalsIgnoreCase("true") && sp.getStaticPlan() != null) {
 			log.info("Launching Hadoop jobs to perform static calculations...");
 			NoCompileMapReduceLauncher mrlauncher = new NoCompileMapReduceLauncher(sp.getStaticPlan());
 			PigStats ps = mrlauncher.launchPig(php, grpName, pc);
@@ -101,11 +100,13 @@ public class StormLauncher extends Launcher {
 					ElementDescriptor fn_from = dfs.asElement(ent.getKey().getFileName());
 					ElementDescriptor fn_to = dfs.asElement(ent.getValue().getFileName());
 					fn_from.rename(fn_to);
-				}
-				
-				// Alter the plan to load from the new locations.
-				new ReplJoinFileFixer(sp).convert();
+				}	
 			}
+		}
+		
+		if (sp.getReplFileMap() != null) {
+			// Alter the plan to load from the new locations.
+			new ReplJoinFileFixer(sp).convert();
 		}
 
 		// Encode the plan into the context for later retrieval.

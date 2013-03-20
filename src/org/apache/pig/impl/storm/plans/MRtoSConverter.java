@@ -31,6 +31,7 @@ import org.apache.pig.impl.plan.OperatorKey;
 import org.apache.pig.impl.plan.PlanException;
 import org.apache.pig.impl.plan.PlanWalker;
 import org.apache.pig.impl.plan.VisitorException;
+import org.apache.pig.impl.storm.io.ISignStore;
 import org.apache.pig.impl.storm.io.NOPLoad;
 import org.apache.pig.impl.storm.io.SignStoreWrapper;
 import org.apache.pig.impl.storm.io.SpoutWrapper;
@@ -101,9 +102,9 @@ public class MRtoSConverter extends MROpPlanVisitor {
 	public void updateUDFs(PhysicalPlan plan) {		
 		try {
 			for (POStore store : PlanHelper.getStores(plan)) {
-				if (store.getStoreFunc() instanceof SignStoreWrapper) {
-					SignStoreWrapper sf = (SignStoreWrapper) store.getStoreFunc();
-					splan.UDFs.add(sf.getWrappedClass());
+				if (store.getStoreFunc() instanceof ISignStore) {
+					ISignStore sf = (ISignStore) store.getStoreFunc();
+					splan.UDFs.addAll(sf.getUDFs());
 				}
 			}
 		
@@ -243,7 +244,7 @@ public class MRtoSConverter extends MROpPlanVisitor {
 			StaticPlanFixer spf = new StaticPlanFixer(plan, pc);
 			spf.convert();
 			// Pull out the replicated join creation plan.
-			ReplJoinFixer rjf = new ReplJoinFixer(plan, spf.getStaticPlan());
+			ReplJoinFixer rjf = new ReplJoinFixer(plan, spf.getStaticPlan(), pc);
 			rjf.convert();
 			if (rjf.getReplFileMap().size() > 0) {
 				splan.setReplFileMap(rjf.getReplFileMap());

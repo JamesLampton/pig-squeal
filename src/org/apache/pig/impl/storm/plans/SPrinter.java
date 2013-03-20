@@ -32,7 +32,7 @@ public class SPrinter extends SOpPlanVisitor {
 
     @Override
     public void visitSOp(StormOper sop) throws VisitorException {
-        mStream.println("Storm node " + sop.getOperatorKey().toString() + " type: " + sop.getType() + " alias: " + sop.name());
+        mStream.println("Storm node " + sop.getOperatorKey().toString() + " type: " + sop.getType() + " alias: " + sop.name() + " parallel: " + sop.getParallelismHint());
         if (sop.getType() == StormOper.OpType.BASIC_PERSIST || sop.getType() == StormOper.OpType.COMBINE_PERSIST) {
         	mStream.println("Backing Store: " + sop.getStateFactoryOpts(pc));
         	if (sop.getWindowOptions() != null) {

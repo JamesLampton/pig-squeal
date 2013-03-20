@@ -21,6 +21,7 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOpe
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLocalRearrange;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
+import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.io.FileSpec;
 import org.apache.pig.impl.plan.DependencyOrderWalker;
 import org.apache.pig.impl.plan.DepthFirstWalker;
@@ -48,13 +49,15 @@ public class ReplJoinFixer extends MROpPlanVisitor {
 	Map<String, MapReduceOper> fnToMOP = new HashMap<String, MapReduceOper>();
 	Map<FileSpec, FileSpec> rFileMap = new HashMap<FileSpec, FileSpec>();
 	boolean swapFiles = false;
+	String pathFixerConst = null;
 
 //	private Set<FileSpec> replFiles = new HashSet<FileSpec>();
 	
-	public ReplJoinFixer(MROperPlan plan, MROperPlan staticPlan) {
+	public ReplJoinFixer(MROperPlan plan, MROperPlan staticPlan, PigContext pc) {
 		super(plan, new DependencyOrderWalker<MapReduceOper, MROperPlan>(plan));
 		this.plan = plan;
 		this.staticPlan = staticPlan;
+		pathFixerConst = pc.getProperties().getProperty("pig.streaming.fixedtmp");
 	}
 	
 	class FRJoinFinder extends PhyPlanVisitor {
@@ -77,7 +80,12 @@ public class ReplJoinFixer extends MROpPlanVisitor {
 	    		// The File/basename etc works for hadoop paths, so we're going to do it the sloppy way.
 	    		String[] parts = f.getFileName().split("/");
 	    		int parent_index = parts.length - 2;
-	    		parts[parent_index] += "-persist";
+	    		if (pathFixerConst != null) {
+	    			parts[parent_index] = pathFixerConst;
+	    		} else {
+	    			parts[parent_index] += "-persist";
+	    		}
+	    		parts[parent_index+1] = Integer.toString(rFileMap.size());
 	    		String newfn = StringUtils.join(parts, "/");
 	    		
 	    		FileSpec newspec = new FileSpec(newfn, f.getFuncSpec());

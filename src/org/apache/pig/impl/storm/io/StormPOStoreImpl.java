@@ -57,8 +57,8 @@ public class StormPOStoreImpl extends POStoreImpl {
  
         storeFunc.prepareToWrite(writer);
         
-        if (storeFunc instanceof SignStoreWrapper) {
-        	((SignStoreWrapper)storeFunc).setSign(sign);
+        if (storeFunc instanceof ISignStore) {
+        	((ISignStore)storeFunc).setSign(sign);
         }
         
         return storeFunc;
