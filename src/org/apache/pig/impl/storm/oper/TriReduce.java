@@ -32,6 +32,7 @@ import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.io.PigNullableWritable;
 import org.apache.pig.impl.plan.VisitorException;
 import org.apache.pig.impl.storm.io.StormPOStoreImpl;
+import org.apache.pig.impl.storm.state.IPigIdxState;
 
 import backtype.storm.tuple.Values;
 
@@ -226,17 +227,15 @@ public class TriReduce extends StormBaseFunction {
 //		System.out.println("TriReduce input: " + tri_tuple);
 		
 		PigNullableWritable key = (PigNullableWritable) tri_tuple.get(0);
+		
+		IPigIdxState s = (IPigIdxState) tri_tuple.get(1);
 	
-		MapWritable m = (MapWritable) tri_tuple.get(1);
+//		MapWritable m = (MapWritable) tri_tuple.get(1);
 		FakeCollector fc = new FakeCollector(collector);
 
 		// Calculate the previous values.
 		List<NullableTuple> tuples;
-		if (windowedInput) {
-			tuples = ReduceWrapper.getTuples(m, ReduceWrapper.LAST);
-		} else {
-			tuples = CombineWrapper.getTuples(m, CombineWrapper.LAST);
-		}
+		tuples = s.getTuples(CombineWrapper.LAST);
 		if (tuples != null) {
 			runReduce(key, tuples, fc);
 		}
@@ -248,11 +247,7 @@ public class TriReduce extends StormBaseFunction {
 //		System.out.println("last_output: " + fc.last_res);
 
 		// Calculate the current values.
-		if (windowedInput) {
-			tuples = ReduceWrapper.getTuples(m, ReduceWrapper.CUR);
-		} else {
-			tuples = CombineWrapper.getTuples(m, CombineWrapper.CUR);
-		}
+		tuples = s.getTuples(CombineWrapper.CUR);
 		fc.switchToCur();
 		runReduce(key, tuples, fc);
 		

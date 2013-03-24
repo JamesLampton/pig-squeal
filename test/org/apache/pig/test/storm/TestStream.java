@@ -204,11 +204,16 @@ public class TestStream extends TestCase {
 //    	pig.registerQuery("words_sl3_2 = JOIN words_sl3 BY word, stoplist3 BY stopword;");
     	
 //    	explain("words_simple_join");
-    	props.setProperty("words_sl3_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"expiration\": 300, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
+//    	props.setProperty("words_sl3_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"expiration\": 300, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
+
+//    	String redis_store_opts = "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"expiration\": 300, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}";
+//    	props.setProperty("words_sl3_store_opts", "{\"StateFactory\":\"org.apache.pig.impl.storm.state.MultiState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"default\": {}, "+
+//    			"\"1\": " + redis_store_opts + " }]}");
+    	
 //    	props.setProperty("words_sl3_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
-    	props.setProperty("words_sl3_window_opts", "{\"0\":2}");
-    	explain("words_sl3_fe");
-//    	registerStore("words_sl3", output);
+//    	props.setProperty("words_sl3_window_opts", "{\"0\":2}");
+//    	explain("words_sl3_fe");
+    	registerStore("words_sl3", output);
 
     	
 //    	pig.registerQuery("x = FILTER x BY $0 == 'the';");
@@ -257,7 +262,7 @@ public class TestStream extends TestCase {
     	pig.registerQuery("hist = FOREACH hist_gr GENERATE group AS wc, COUNT(count) AS freq;");
     	pig.registerQuery("hist = FILTER hist BY freq > 0;");
     	    	
-    	registerStore("hist", output);
+//    	registerStore("hist", output);
 //    	registerStore("x", output);
 //    	registerStore("count_gr", output);
 //    	registerStore("count", output);

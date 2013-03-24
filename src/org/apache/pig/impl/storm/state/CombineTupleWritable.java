@@ -9,10 +9,13 @@ import java.util.List;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
+import org.apache.pig.impl.io.NullableTuple;
+import org.apache.pig.impl.storm.oper.TriCombinePersist;
+import org.apache.pig.impl.util.Pair;
 
 import backtype.storm.utils.WritableUtils;
 
-public class CombineTupleWritable implements Writable {
+public class CombineTupleWritable implements Writable, IPigIdxState {
 	private List<Writable> values;
 	
 	public CombineTupleWritable() {
@@ -62,5 +65,20 @@ public class CombineTupleWritable implements Writable {
 	
 	public String toString() {
 		return "CombineTupleWritable(" + values.toString() + ")";
+	}
+
+	@Override
+	public List<NullableTuple> getTuples(Text which) {
+		return TriCombinePersist.getTuples(this);
+	}
+
+	@Override
+	public Pair<Writable, List<Writable>> separate(List<Integer[]> bins) {
+		throw new RuntimeException("Not implemented for combined plans.");
+	}
+
+	@Override
+	public void merge(IPigIdxState other) {
+		throw new RuntimeException("Not implemented for combined plans.");		
 	}
 }

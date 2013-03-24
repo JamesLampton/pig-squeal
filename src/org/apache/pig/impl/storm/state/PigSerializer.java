@@ -54,9 +54,10 @@ public class PigSerializer implements Serializer {
 					dbuf.writeByte(HDataType.findTypeFromNullableWritable(pnw));
 					pnw.write(dbuf);
 				}				
-			} else if (o instanceof MapWritable) {
-				dbuf.writeByte(1);				
-				((MapWritable) o).write(dbuf);
+			} else if (o instanceof Writable) {
+				dbuf.writeByte(1);
+				dbuf.writeUTF(o.getClass().getName());
+				((Writable) o).write(dbuf);
 			} else {
 				throw new RuntimeException("Unexpected type: " + o.getClass());
 			}
@@ -91,9 +92,11 @@ public class PigSerializer implements Serializer {
 				}
 				ret = arr;
 			} else if (write_type == 1) {
-				MapWritable m = new MapWritable();
-				m.readFields(dis);
-				ret = m;
+				String cls = dis.readUTF();
+				
+				Writable c = (Writable) Class.forName(cls).newInstance();
+				c.readFields(dis);
+				ret = c;
 			}
 			
 			return ret;

@@ -1,21 +1,24 @@
 package org.apache.pig.impl.storm.oper;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map.Entry;
 
-import org.apache.hadoop.io.MapWritable;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.mapred.join.TupleWritable;
 import org.apache.pig.impl.io.NullableTuple;
-import org.apache.pig.impl.storm.state.CombineTupleWritable;
+import org.apache.pig.impl.storm.state.IPigIdxState;
+import org.apache.pig.impl.storm.state.MapIdxWritable;
+import org.apache.pig.impl.util.Pair;
 
 import storm.trident.operation.CombinerAggregator;
 import storm.trident.tuple.TridentTuple;
 
-public class CombineWrapper implements CombinerAggregator<MapWritable> {
+public class CombineWrapper implements CombinerAggregator<MapIdxWritable> {
 	private CombinerAggregator<Writable> agg;
 	static public final Text CUR = new Text("cur");
 	static public final Text LAST = new Text("last");
@@ -25,13 +28,13 @@ public class CombineWrapper implements CombinerAggregator<MapWritable> {
 	}
 
 	@Override
-	public MapWritable init(TridentTuple tuple) {
-		MapWritable ret = zero();
+	public MapIdxWritable init(TridentTuple tuple) {
+		MapIdxWritable ret = zero();
 		ret.put(CUR, agg.init(tuple));
 		return ret;
 	}
 
-	Writable getDefault(MapWritable v, Text k) {
+	Writable getDefault(MapIdxWritable v, Text k) {
 		if (v.containsKey(k)) {
 			return v.get(k);
 		}
@@ -39,9 +42,9 @@ public class CombineWrapper implements CombinerAggregator<MapWritable> {
 	}
 	
 	@Override
-	public MapWritable combine(MapWritable val1, MapWritable val2) {
+	public MapIdxWritable combine(MapIdxWritable val1, MapIdxWritable val2) {
 //		System.out.println("combine: " + val1 + " " + val2);
-		MapWritable ret = zero();
+		MapIdxWritable ret = zero();
 
 		// Assuming that val1 came from the cache/state.
 		if (val1.get(CUR) != null) {
@@ -51,10 +54,63 @@ public class CombineWrapper implements CombinerAggregator<MapWritable> {
 			
 		return ret;
 	}
+	
+	public static class CombineWrapperState extends MapIdxWritable {
+		@Override
+		public List<NullableTuple> getTuples(Text which) {
+			return CombineWrapper.getTuples(this, which);
+		}
+		
+		@Override
+		public Pair<Writable, List<Writable>> separate(List<Integer[]> bins) {
+			MapIdxWritable def = null;
+			List<MapIdxWritable> ret = new ArrayList<MapIdxWritable>(bins.size());
+			
+			for (Integer[] bin : bins) {
+				ret.add(null);
+			}
+			
+			for (Entry<Writable, Writable> ent : entrySet()) {
+				IPigIdxState wrapped = (IPigIdxState) ent.getValue();
+				
+				Pair<Writable, List<Writable>> res = wrapped.separate(bins);
+				// Set the appropriate bins in this return.
+				if (res.first != null) {
+					if (def == null) {
+						def = new CombineWrapperState();
+					}
+					def.put(ent.getKey(), res.first);					
+				}
+
+				for(int i = 0; i < res.second.size(); i++) {
+					if (res.second.get(i) != null) {
+						if (ret.get(i) == null) {
+							ret.set(i, new CombineWrapperState());
+						}
+						ret.get(i).put(ent.getKey(), res.second.get(i));
+					}
+				}
+			}
+			
+			return new Pair(def, ret);
+		}
+
+		@Override
+		public void merge(IPigIdxState other) {
+			for (Entry<Writable, Writable> ent : ((CombineWrapperState)other).entrySet()) {
+				IPigIdxState cur = (IPigIdxState) get(ent.getKey());
+				if (cur == null) {
+					put(ent.getKey(), ent.getValue());
+				} else {
+					cur.merge((IPigIdxState) ent.getValue());
+				}
+			}
+		}
+	}
 
 	@Override
-	public MapWritable zero() {
-		return new MapWritable();		
+	public MapIdxWritable zero() {
+		return new CombineWrapperState();
 	}
 	
 	public static Comparator<NullableTuple> NullableTupleComparator = new Comparator<NullableTuple>() {
@@ -68,21 +124,13 @@ public class CombineWrapper implements CombinerAggregator<MapWritable> {
 		}
 	};
 
-	public static List<NullableTuple> getTuples(MapWritable m, Text which) {
+	public static List<NullableTuple> getTuples(MapIdxWritable m, Text which) {
 
-		Writable state = m.get(which);
+		IPigIdxState state = (IPigIdxState) m.get(which);
 		if (state == null) {
 			return null;
 		}
-		
-		List<NullableTuple> ret;
-
-		if (state instanceof MapWritable) {
-			ret = TriBasicPersist.getTuples((MapWritable) state);
-		} else {
-			ret = TriCombinePersist.getTuples((CombineTupleWritable) state);
-		}
-		
+		List<NullableTuple> ret = state.getTuples(which);		
 		// Sort the tuples as the shuffle would.
 		Collections.sort(ret, NullableTupleComparator);
 		

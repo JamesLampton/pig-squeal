@@ -277,4 +277,8 @@ public class WindowBuffer<T extends Writable> implements Writable {
 	public String toString() {
 		return "WindowBuffer(maxSize: " + maxSize + ", cur_count: " + cur_count + ")";
 	}
+	
+	public int size() {
+		return cur_count;
+	}
 }

@@ -1,5 +1,8 @@
 package org.apache.pig.impl.storm.oper;
 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -7,16 +10,19 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.MapWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.pig.impl.io.NullableTuple;
+import org.apache.pig.impl.storm.state.IPigIdxState;
+import org.apache.pig.impl.storm.state.MapIdxWritable;
 import org.apache.pig.impl.storm.state.WindowBuffer;
+import org.apache.pig.impl.util.Pair;
 import org.mortbay.util.ajax.JSON;
 
 import storm.trident.operation.CombinerAggregator;
 import storm.trident.tuple.TridentTuple;
 
-public class TriWindowCombinePersist implements CombinerAggregator<MapWritable> {
+public class TriWindowCombinePersist implements CombinerAggregator<MapIdxWritable> {
 	
 	Map<Integer, Long> windowSettings = new HashMap<Integer, Long>();
 	
@@ -35,9 +41,7 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapWritable> 
 		}
 	}
 
-	static public List<NullableTuple> getTuples(MapWritable state) {
-		// TODO: Handle windowed elements.
-		
+	static public List<NullableTuple> getTuples(MapIdxWritable state) {		
 		List<NullableTuple> ret = new ArrayList<NullableTuple>();
 		
 		for (Entry<Writable, Writable> ent : state.entrySet()) {
@@ -63,7 +67,7 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapWritable> 
 		return ret;
 	}
 	
-	void addTuple(MapWritable s, NullableTuple t, int c) {
+	void addTuple(MapIdxWritable s, NullableTuple t, int c) {
 		int idx = t.getIndex();
 		Long ws = windowSettings.get(idx);
 		if (ws != null) {
@@ -99,8 +103,8 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapWritable> 
 	}
 	
 	@Override
-	public MapWritable init(TridentTuple tuple) {
-		MapWritable ret = zero();
+	public MapIdxWritable init(TridentTuple tuple) {
+		MapIdxWritable ret = zero();
 		NullableTuple values = (NullableTuple) tuple.get(1);
 		
 		// Track the +/- stuff through.
@@ -108,7 +112,7 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapWritable> 
 		return ret;
 	}
 	
-	String dumpToString(MapWritable state) {
+	String dumpToString(MapIdxWritable state) {
 		StringBuilder sb = new StringBuilder();
 		
 		sb.append(this.getClass().getName()+"[");
@@ -132,7 +136,7 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapWritable> 
 		return sb.toString();
 	}
 	
-	void mergeValues(MapWritable into, MapWritable from) {
+	void mergeValues(MapIdxWritable into, MapIdxWritable from) {
 		for (Entry<Writable, Writable> ent : from.entrySet()) {
 			// See if this is a windowed element.
 			if (ent.getKey() instanceof IntWritable) {
@@ -157,12 +161,12 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapWritable> 
 	}
 
 	@Override
-	public MapWritable combine(MapWritable val1, MapWritable val2) {
+	public MapIdxWritable combine(MapIdxWritable val1, MapIdxWritable val2) {
 //		System.out.println("TriWindowCombinePersist.combine -- ");
 //		System.out.println("val1 -- " + dumpToString(val1));
 //		System.out.println("val2 -- " + dumpToString(val2));
 		
-		MapWritable ret = zero();
+		MapIdxWritable ret = zero();
 		
 		// Merge the values
 		mergeValues(ret, val1);
@@ -170,17 +174,127 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapWritable> 
 		
 		return ret;
 	}
-
-	@Override
-	public MapWritable zero() {
-		MapWritable ret = new MapWritable();
+	
+	static public class WindowCombineState extends MapIdxWritable {
+		private Map<Integer, Long> settings;
 		
-		// Initialize any windows.
-		for (Entry<Integer, Long> ent : windowSettings.entrySet()) {
-			ret.put(new IntWritable(ent.getKey()), 
-					new WindowBuffer<NullableTuple>(
-							ent.getValue().intValue()));
+		// Override default write to track the settings in case
+		// some of the elements age off.
+		@Override
+		public void write(DataOutput out) throws IOException {
+			out.writeInt(settings.size());
+			for (java.util.Map.Entry<Integer, Long> ent : settings.entrySet()) {
+				out.writeInt(ent.getKey());
+				out.writeLong(ent.getValue());
+			}
+			super.write(out);
 		}
+		
+		@Override
+		public void readFields(DataInput in) throws IOException {
+			int size = in.readInt();
+			this.clear();
+			Map<Integer, Long> in_set = new HashMap<Integer, Long>(size);
+			for (int i = 0; i < size; i++) {
+				int k = in.readInt();
+				long v = in.readLong();
+				in_set.put(k, v);
+			}
+			init(in_set);
+			super.readFields(in);
+		}
+
+		public WindowCombineState() {
+			// Needed for readFields.
+		}
+		
+		public WindowCombineState(Map<Integer, Long> windowSettings) {
+			init(windowSettings);
+		}
+		
+		void init(Map<Integer, Long> windowSettings) {
+			this.settings = windowSettings;
+			
+			// Initialize any windows.
+			for (Entry<Integer, Long> ent : windowSettings.entrySet()) {
+				put(new IntWritable(ent.getKey()), 
+						new WindowBuffer<NullableTuple>(
+								ent.getValue().intValue()));
+			}
+		}
+		
+		@Override
+		public List<NullableTuple> getTuples(Text which) {
+			return TriWindowCombinePersist.getTuples(this);
+		}
+
+		@Override
+		public Pair<Writable, List<Writable>> separate(List<Integer[]> bins) {
+			MapIdxWritable def = null;
+			List<MapIdxWritable> ret = new ArrayList<MapIdxWritable>(bins.size());
+			HashMap<Integer, Integer> idxMap = new HashMap<Integer, Integer>();
+			
+			for (Integer[] bin : bins) {
+//				MapIdxWritable st = new WindowCombineState(settings);
+				for (Integer i : bin) {
+					idxMap.put(i, ret.size());
+				}
+				ret.add(null);
+			}
+			
+			for (Entry<Writable, Writable> ent : entrySet()) {
+				int idx;
+				if (ent.getKey().getClass().isAssignableFrom(IntWritable.class)) {
+					// This is a windowed element.
+					idx = ((IntWritable)ent.getKey()).get(); 
+				} else {
+					NullableTuple v = (NullableTuple) ent.getKey();
+					idx = v.getIndex();
+				}
+
+				// Look up the appropriate state.
+				Integer mappedIdx = idxMap.get(idx);
+				MapIdxWritable mapped; // = idxMap.get(idx);
+				if (mappedIdx == null) {
+					if (def == null) {
+						def = new WindowCombineState(settings);
+					}
+					mapped = def;
+				} else {
+					mapped = ret.get(mappedIdx);
+					if (mapped == null) {
+						mapped = new WindowCombineState(settings);
+						ret.set(mappedIdx, mapped);
+					}
+				}
+				mapped.put(ent.getKey(), ent.getValue());
+			}
+			
+			return new Pair(def, ret);
+		}
+
+		@Override
+		public void merge(IPigIdxState other) {
+			for (Entry<Writable, Writable> ent : ((WindowCombineState)other).entrySet()) {
+				if (ent.getKey().getClass().isAssignableFrom(IntWritable.class)) {
+					// This is a windowed element.
+					WindowBuffer<NullableTuple> w = (WindowBuffer<NullableTuple>) ent.getValue();
+					// The windows should have been partitioned, so if we have anything within
+					// replace ours.
+					if (w.size() > 0) {
+						put(ent.getKey(), ent.getValue());
+					}
+				} else {
+					// Not windowed, just put it.
+					put(ent.getKey(), ent.getValue());
+				}
+			}
+		}
+	}
+	
+	@Override
+	public MapIdxWritable zero() {
+		MapIdxWritable ret = new WindowCombineState(windowSettings);
 		
 		return ret;
 	}

@@ -33,6 +33,10 @@ public class StateWrapper {
 	}
 	
 	public StateFactory getStateFactory() {
+		return getStateFactoryFromArgs(stateFactoryCN, staticMethod, args);
+	}
+	
+	public static StateFactory getStateFactoryFromArgs(String stateFactoryCN, String staticMethod, Object[] args) {
 		if (stateFactoryCN == null) {
 			return new LRUMemoryMapState.Factory(2000);
 		}

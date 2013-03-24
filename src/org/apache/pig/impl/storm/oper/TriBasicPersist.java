@@ -1,20 +1,25 @@
 package org.apache.pig.impl.storm.oper;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
 
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.MapWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.pig.impl.io.NullableTuple;
+import org.apache.pig.impl.storm.oper.TriWindowCombinePersist.WindowCombineState;
+import org.apache.pig.impl.storm.state.IPigIdxState;
+import org.apache.pig.impl.storm.state.MapIdxWritable;
+import org.apache.pig.impl.util.Pair;
 
 import storm.trident.operation.CombinerAggregator;
 import storm.trident.tuple.TridentTuple;
 
-public class TriBasicPersist implements CombinerAggregator<MapWritable> {
+public class TriBasicPersist implements CombinerAggregator<MapIdxWritable> {
 	
-	static public List<NullableTuple> getTuples(MapWritable state) {
+	static public List<NullableTuple> getTuples(MapIdxWritable state) {
 		List<NullableTuple> ret = new ArrayList<NullableTuple>();
 		
 		for (Entry<Writable, Writable> ent : state.entrySet()) {
@@ -33,8 +38,8 @@ public class TriBasicPersist implements CombinerAggregator<MapWritable> {
 	}
 
 	@Override
-	public MapWritable init(TridentTuple tuple) {
-		MapWritable ret = zero();
+	public MapIdxWritable init(TridentTuple tuple) {
+		MapIdxWritable ret = zero();
 		NullableTuple values = (NullableTuple) tuple.get(1);
 		
 		// Track the +/- stuff through.
@@ -43,8 +48,8 @@ public class TriBasicPersist implements CombinerAggregator<MapWritable> {
 	}
 
 	@Override
-	public MapWritable combine(MapWritable val1, MapWritable val2) {
-		MapWritable ret = zero();
+	public MapIdxWritable combine(MapIdxWritable val1, MapIdxWritable val2) {
+		MapIdxWritable ret = zero();
 		
 		if (val1 != null) {
 			for (Entry<Writable, Writable> ent : val1.entrySet()) {
@@ -68,9 +73,61 @@ public class TriBasicPersist implements CombinerAggregator<MapWritable> {
 		
 		return ret;
 	}
+	
+	public static class TriBasicPersistState extends MapIdxWritable {
+		@Override
+		public List<NullableTuple> getTuples(Text which) {
+			return TriBasicPersist.getTuples(this);
+		}
+		
+		@Override
+		public Pair<Writable, List<Writable>> separate(List<Integer[]> bins) {
+			MapIdxWritable def = null; // = new TriBasicPersistState();
+			List<MapIdxWritable> ret = new ArrayList<MapIdxWritable>(bins.size());
+			HashMap<Integer, Integer> idxMap = new HashMap<Integer, Integer>();
+			
+			for (Integer[] bin : bins) {
+//				MapIdxWritable st = new TriBasicPersistState();
+				
+				for (Integer i : bin) {
+					idxMap.put(i, ret.size());
+				}
+				ret.add(null);
+			}
+			
+			for (Entry<Writable, Writable> ent : entrySet()) {
+				NullableTuple v = (NullableTuple) ent.getKey();
+				int idx = v.getIndex();
+
+				// Look up the appropriate state.
+				Integer mappedIdx = idxMap.get(idx);
+				MapIdxWritable mapped;
+				if (mappedIdx == null) {
+					if (def == null) {
+						def = new TriBasicPersistState();
+					}
+					mapped = def;
+				} else {
+					mapped = ret.get(mappedIdx);
+					if (mapped == null) {
+						mapped = new TriBasicPersistState();
+						ret.set(mappedIdx, mapped);
+					}
+				}
+				mapped.put(ent.getKey(), ent.getValue());
+			}
+			
+			return new Pair(def, ret);
+		}
+
+		@Override
+		public void merge(IPigIdxState other) {
+			putAll(((TriBasicPersistState)other));
+		}
+	}
 
 	@Override
-	public MapWritable zero() {
-		return new MapWritable();
+	public MapIdxWritable zero() {
+		return new TriBasicPersistState();
 	}
 }
