@@ -11,13 +11,26 @@ import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.io.Writable;
+import org.apache.pig.backend.hadoop.HDataType;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.PhysicalOperator;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhysicalPlan;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POPackage;
+import org.apache.pig.data.DataType;
 import org.apache.pig.impl.PigContext;
+import org.apache.pig.impl.io.NullableBag;
+import org.apache.pig.impl.io.NullableBooleanWritable;
+import org.apache.pig.impl.io.NullableBytesWritable;
+import org.apache.pig.impl.io.NullableDoubleWritable;
+import org.apache.pig.impl.io.NullableFloatWritable;
+import org.apache.pig.impl.io.NullableIntWritable;
+import org.apache.pig.impl.io.NullableLongWritable;
+import org.apache.pig.impl.io.NullableText;
+import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.plan.DependencyOrderWalker;
 import org.apache.pig.impl.plan.VisitorException;
+import org.apache.pig.impl.storm.io.WritableKryoSerializer;
 import org.apache.pig.impl.storm.oper.CombineWrapper;
 import org.apache.pig.impl.storm.oper.TriBasicPersist;
 import org.apache.pig.impl.storm.oper.TriCombinePersist;
@@ -28,11 +41,15 @@ import org.apache.pig.impl.storm.oper.TriWindowCombinePersist;
 import org.apache.pig.impl.storm.plans.SOpPlanVisitor;
 import org.apache.pig.impl.storm.plans.SOperPlan;
 import org.apache.pig.impl.storm.plans.StormOper;
+import org.apache.pig.impl.storm.state.CombineTupleWritable;
 import org.apache.pig.impl.util.MultiMap;
 import org.apache.pig.impl.util.ObjectSerializer;
 
 import backtype.storm.Config;
 import backtype.storm.LocalCluster;
+import backtype.storm.StormSubmitter;
+import backtype.storm.generated.AlreadyAliveException;
+import backtype.storm.generated.InvalidTopologyException;
 import backtype.storm.tuple.Fields;
 import backtype.storm.utils.Utils;
 
@@ -280,20 +297,54 @@ public class Main {
 		}
 	}
 	
-	public void launch() {
-		// FIXME: Call out to storm jar.
+	public void registerSerializer(Config conf) {
+//		conf.registerSerialization(Writable.class, WritableKryoSerializer.class);
+		
+		// PigTypes
+		conf.registerSerialization(NullableBooleanWritable.class, WritableKryoSerializer.class);
+		conf.registerSerialization(NullableBytesWritable.class, WritableKryoSerializer.class);
+		conf.registerSerialization(NullableText.class, WritableKryoSerializer.class);
+		conf.registerSerialization(NullableFloatWritable.class, WritableKryoSerializer.class);
+		conf.registerSerialization(NullableDoubleWritable.class, WritableKryoSerializer.class);
+		conf.registerSerialization(NullableIntWritable.class, WritableKryoSerializer.class);
+		conf.registerSerialization(NullableLongWritable.class, WritableKryoSerializer.class);
+		conf.registerSerialization(NullableBag.class, WritableKryoSerializer.class);
+	    conf.registerSerialization(NullableTuple.class, WritableKryoSerializer.class);
+		
+	    // Squeal Types
+	    conf.registerSerialization(CombineWrapper.CombineWrapperState.class, WritableKryoSerializer.class);
+	    conf.registerSerialization(TriBasicPersist.TriBasicPersistState.class, WritableKryoSerializer.class);
+	    conf.registerSerialization(TriWindowCombinePersist.WindowCombineState.class, WritableKryoSerializer.class);
+	    conf.registerSerialization(CombineTupleWritable.class, WritableKryoSerializer.class);
+	}
+	
+	public void launch() throws AlreadyAliveException, InvalidTopologyException {
+		String topology_name = pc.getProperties().getProperty("pig.streaming.topology.name", "PigStorm-" + pc.getLastAlias());
+		
 		
 		if (pc.getProperties().getProperty("pig.streaming.run.test.cluster", "false").equalsIgnoreCase("true")) {
 			log.info("Running test cluster...");
 			
 			boolean debug = pc.getProperties().getProperty("pig.streaming.debug", "false").equalsIgnoreCase("true");
 			int wait_time = Integer.parseInt(pc.getProperties().getProperty("pig.streaming.run.test.cluster.wait_time", "10000"));
-
-			String topology_name = pc.getProperties().getProperty("pig.streaming.topology.name", "PigStorm-" + pc.getLastAlias());
 			
 			runTestCluster(topology_name, wait_time, debug);
 			
 			log.info("Back from test cluster.");
+		} else {			
+			Config conf = new Config();
+			
+			int workers = Integer.parseInt(pc.getProperties().getProperty("pig.streaming.workers", "4"));
+			conf.setNumWorkers(workers);
+			int ackers = Integer.parseInt(pc.getProperties().getProperty("pig.streaming.ackers", "1"));
+			conf.setNumAckers(ackers);
+			
+			// Register a Serializer for any Writable.
+			registerSerializer(conf);
+			
+			StormSubmitter submitter = new StormSubmitter();
+			
+			submitter.submitTopology(topology_name, conf, t.build());
 		}
 	}
 	
@@ -312,7 +363,7 @@ public class Main {
 		return o;
 	}
 	
-	public void runMain(String[] args) throws IOException {
+	public void runMain(String[] args) throws IOException, AlreadyAliveException, InvalidTopologyException {
 		/* Create the Pig context */
 		pc = (PigContext) getStuff("pigContext");
 		initFromPigContext(pc);
@@ -322,27 +373,5 @@ public class Main {
 	public static void main(String[] args) throws Exception {
 		Main m = new Main();
 		m.runMain(args);
-		
-//		if (args.length > 0) {
-//			Map conf = new HashMap();
-//			int workers = 2;
-//			conf.put(Config.TOPOLOGY_WORKERS, workers);
-//			StormSubmitter submitter = new StormSubmitter();
-//			
-//			submitter.submitTopology(args[0], conf, setupTopology("NMTwitterInput", workers).build());
-//		} else {
-//			// Run test.
-//			Map conf = new HashMap();
-//			conf.put(Config.TOPOLOGY_WORKERS, 1);
-////		    conf.put(Config.STORM_CLUSTER_MODE, "distributed"); 
-//			//conf.put(Config.TOPOLOGY_DEBUG, true);
-//
-//			LocalCluster cluster = new LocalCluster();
-//			cluster.submitTopology("nationmind", conf, setupTopology(null, 1).build());
-//			/*
-//			Utils.sleep(60000);
-//			cluster.shutdown();
-//			*/
-//		}
 	}
 }

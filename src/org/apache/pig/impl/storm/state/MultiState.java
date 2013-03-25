@@ -45,13 +45,13 @@ public class MultiState implements IBackingMap<IPigIdxState> {
 		}
 		
 		public Factory(HashMap args) {
-			System.out.println("MultiState.Factory: " + args);
+//			System.out.println("MultiState.Factory: " + args);
 			bins_in = new ArrayList<Integer[]>();
 			state_facts = new ArrayList<StateFactory>();
 			
 			// Parse the args.
 			for (Object k : args.keySet()) {
-				System.out.println("MultiState.Factory: " + k + " -> " + args.get(k));
+//				System.out.println("MultiState.Factory: " + k + " -> " + args.get(k));
 				Map opts = (Map) args.get(k);
 				StateFactory k_fact = StateWrapper.getStateFactoryFromArgs(
 						(String) opts.get("StateFactory"), 
