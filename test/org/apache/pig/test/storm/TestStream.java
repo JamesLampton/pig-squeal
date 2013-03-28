@@ -213,7 +213,7 @@ public class TestStream extends TestCase {
 //    	props.setProperty("words_sl3_store_opts", "{\"StateFactory\":\"edu.umd.estuary.storm.trident.state.RedisState\", \"StaticMethod\": \"fromJSONArgs\", \"args\": [{\"servers\": \"localhost\", \"dbNum\": 3, \"serializer\":\"org.apache.pig.impl.storm.state.GZPigSerializer\", \"key_serializer\":\"org.apache.pig.impl.storm.state.PigTextSerializer\"}]}");
 //    	props.setProperty("words_sl3_window_opts", "{\"0\":2}");
 //    	explain("words_sl3_fe");
-    	registerStore("words_sl3", output);
+//    	registerStore("words_sl3", output);
 
     	
 //    	pig.registerQuery("x = FILTER x BY $0 == 'the';");
@@ -262,7 +262,7 @@ public class TestStream extends TestCase {
     	pig.registerQuery("hist = FOREACH hist_gr GENERATE group AS wc, COUNT(count) AS freq;");
     	pig.registerQuery("hist = FILTER hist BY freq > 0;");
     	    	
-//    	registerStore("hist", output);
+    	registerStore("hist", output);
 //    	registerStore("x", output);
 //    	registerStore("count_gr", output);
 //    	registerStore("count", output);
