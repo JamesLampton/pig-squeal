@@ -233,23 +233,27 @@ public class TriReduce extends StormBaseFunction {
 //		MapWritable m = (MapWritable) tri_tuple.get(1);
 		FakeCollector fc = new FakeCollector(collector);
 
-		// Calculate the previous values.
-		List<NullableTuple> tuples;
-		tuples = s.getTuples(CombineWrapper.LAST);
-		if (tuples != null) {
-			runReduce(key, tuples, fc);
-		}
-		
-//		System.out.println("TriReduce |last_input|: " + ((tuples == null) ? 0 : tuples.size()) + " |last_output| : " + fc.last_res.size());
-//		if (tuples != null) {
-//			System.out.println("last_input: " + tuples);
-//		}
-//		System.out.println("last_output: " + fc.last_res);
+		try {
+			// Calculate the previous values.
+			List<NullableTuple> tuples;
+			tuples = s.getTuples(CombineWrapper.LAST);
+			if (tuples != null) {
+				runReduce(key, tuples, fc);
+			}
 
-		// Calculate the current values.
-		tuples = s.getTuples(CombineWrapper.CUR);
-		fc.switchToCur();
-		runReduce(key, tuples, fc);
+			//		System.out.println("TriReduce |last_input|: " + ((tuples == null) ? 0 : tuples.size()) + " |last_output| : " + fc.last_res.size());
+			//		if (tuples != null) {
+			//			System.out.println("last_input: " + tuples);
+			//		}
+			//		System.out.println("last_output: " + fc.last_res);
+
+			// Calculate the current values.
+			tuples = s.getTuples(CombineWrapper.CUR);
+			fc.switchToCur();
+			runReduce(key, tuples, fc);
+		} catch (Exception e) {
+			throw new RuntimeException("Error processing: " + tri_tuple, e);
+		}
 		
 //		System.out.println("TriReduce |cur_input|: " + tuples.size() + " |cur_output| : " + fc.cur_res.size());
 

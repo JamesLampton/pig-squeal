@@ -4,10 +4,13 @@ import java.util.HashMap;
 import java.util.Iterator;
 
 import org.apache.pig.backend.executionengine.ExecException;
+import org.apache.pig.backend.hadoop.HDataType;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.POStatus;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.Result;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POPackage;
+import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
+import org.apache.pig.data.TupleFactory;
 import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.io.PigNullableWritable;
 import org.apache.pig.impl.plan.OperatorKey;
@@ -35,6 +38,7 @@ public class TridentStatePack extends POPackage {
 	CombinerAggregator agg;
 	TridentTupleView.FreshOutputFactory tFactory;
 	private String windowOpts;
+	private TupleFactory tf;
 	private final static Integer POS = 1;
 	
 	public TridentStatePack(OperatorKey k, StateFactory stateFactory, String windowOpts) {
@@ -55,14 +59,20 @@ public class TridentStatePack extends POPackage {
 				agg = new CombineWrapper(new TriWindowCombinePersist(windowOpts));
 			}
 			tFactory = new TridentTupleView.FreshOutputFactory(new Fields("k", "v", "s"));
+			tf = TupleFactory.getInstance();
 			
 			System.out.println("TridentStatePack.attachInput initialized state: " + stateFactory + " agg: " + agg + " windowOpts: " + windowOpts);
+			
 		}
 
 		// Aggregate the values.
 		Object state = null;
 		while (inp.hasNext()) {
-			NullableTuple t = inp.next();
+			// Need to copy this thing because the reference is reused.
+			NullableTuple ref = inp.next();
+			Tuple tup = (Tuple) ref.getValueAsPigType();
+			NullableTuple t = new NullableTuple(tf.newTuple(tup.getAll()));
+			t.setIndex(ref.getIndex());
 			
 			// Create a trident tuple.
 			TridentTuple triTuple = tFactory.create(new Values(k, t, POS));
@@ -70,12 +80,15 @@ public class TridentStatePack extends POPackage {
 			// Initialize the current tuple t.
 			Object t_init = agg.init(triTuple);
 			
+//			System.out.println("k: " + k + " t: " + t + " t_init: " + t_init + " state_pre: " + state);
+			
 			// And combine
 			if (state == null) {
 				state = t_init;
 			} else {
 				state = agg.combine(state, t_init);
 			}
+//			System.out.println("k: " + k + " t: " + t + " t_init: " + t_init + " state_post: " + state);
 		}
 		
 		// Stash it out to the state.

@@ -20,11 +20,17 @@ import storm.trident.tuple.TridentTuple;
 
 public class CombineWrapper implements CombinerAggregator<MapIdxWritable> {
 	private CombinerAggregator<Writable> agg;
+	private boolean trackLast;
 	static public final Text CUR = new Text("cur");
 	static public final Text LAST = new Text("last");
 	
-	public CombineWrapper(CombinerAggregator agg) {
+	public CombineWrapper(CombinerAggregator agg, boolean trackLast) {
 		this.agg = (CombinerAggregator<Writable>) agg;
+		this.trackLast = trackLast;
+	}
+
+	public CombineWrapper(CombinerAggregator agg) {
+		this(agg, false);
 	}
 
 	@Override
@@ -47,7 +53,7 @@ public class CombineWrapper implements CombinerAggregator<MapIdxWritable> {
 		MapIdxWritable ret = zero();
 
 		// Assuming that val1 came from the cache/state.
-		if (val1.get(CUR) != null) {
+		if (trackLast && val1.get(CUR) != null) {
 			ret.put(LAST, val1.get(CUR));
 		}
 		ret.put(CUR, agg.combine(getDefault(val1, CUR), getDefault(val2, CUR)));

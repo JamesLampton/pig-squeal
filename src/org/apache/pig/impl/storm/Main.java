@@ -58,6 +58,8 @@ import storm.trident.TridentState;
 import storm.trident.TridentTopology;
 import storm.trident.fluent.GroupedStream;
 import storm.trident.operation.builtin.Debug;
+import storm.trident.state.map.MapCombinerAggStateUpdater;
+import storm.trident.util.TridentUtils;
 
 public class Main {
 	
@@ -202,29 +204,36 @@ public class Main {
 						);
 				
 				// Setup the aggregator.
+				// We want one aggregator to handle the actual combine.
 				CombineWrapper agg = null;
+				// We want this one to keep track of LAST -- it's used with storage and right before reducedelta.
+				CombineWrapper store_agg = null;
 				if (sop.getType() == StormOper.OpType.BASIC_PERSIST) {
 					if (sop.getWindowOptions() == null) {
-						agg = new CombineWrapper(new TriBasicPersist());
+						agg = new CombineWrapper(new TriBasicPersist(), false);
+						store_agg = new CombineWrapper(new TriBasicPersist(), true);
 					} else {
 						// We'll be windowing things.
-						agg = new CombineWrapper(new TriWindowCombinePersist(sop.getWindowOptions()));
+						agg = new CombineWrapper(new TriWindowCombinePersist(sop.getWindowOptions()), false);
+						store_agg = new CombineWrapper(new TriWindowCombinePersist(sop.getWindowOptions()), true); 
 					}
 				} else {					
 					// We need to trim things from the plan re:PigCombiner.java
 					POPackage pack = (POPackage) sop.getPlan().getRoots().get(0);
 					sop.getPlan().remove(pack);
 
-					agg = new CombineWrapper(new TriCombinePersist(pack, sop.getPlan(), sop.mapKeyType)); 
+					agg = new CombineWrapper(new TriCombinePersist(pack, sop.getPlan(), sop.mapKeyType), false);
+					store_agg = new CombineWrapper(new TriCombinePersist(pack, sop.getPlan(), sop.mapKeyType), true);
 				}
 
 				// Group and aggregate
 				TridentState gr_persist = input.groupBy(group_key)
-						.persistentAggregate(
-								sop.getStateFactory(pc),
-								orig_input_fields,
-								agg, 
-								output_fields
+						.aggregate(orig_input_fields, agg, output_fields)
+						.partitionPersist(
+									sop.getStateFactory(pc),
+									TridentUtils.fieldsUnion(group_key, output_fields),
+									new MapCombinerAggStateUpdater(store_agg, group_key, output_fields),
+									TridentUtils.fieldsConcat(group_key, output_fields)
 								);
 				if (sop.getParallelismHint() > 0) {
 					gr_persist.parallelismHint(sop.getParallelismHint());
