@@ -44,7 +44,7 @@ public class StateStore extends PigStorage implements ISignStore {
 	public void putNext(Tuple t) throws IOException {
 		if (s == null) {
 			StateFactory stateFactory = new StateWrapper(jsonOpts).getStateFactory();
-			s = (MapState) stateFactory.makeState(new HashMap(), 0, 1);
+			s = (MapState) stateFactory.makeState(new HashMap(), null, 0, 1);
 		}
 		
 		if (sign.get() < 0) {

@@ -116,6 +116,8 @@ public class Main {
 					// Probably a static load.
 					continue;
 				}
+				System.out.println("Setting output name: " + sop.name());
+				input = input.name(sop.name());
 				
 				MultiMap<PhysicalOperator, PhysicalOperator> opmap = new MultiMap<PhysicalOperator, PhysicalOperator>();
 				sop.getPlan().setOpMap(opmap);
@@ -165,6 +167,9 @@ public class Main {
 			if (sop.getType() == StormOper.OpType.SPOUT) {
 				output = topology.newStream(sop.getOperatorKey().toString(), sop.getLoadFunc());
 				
+				System.out.println("Setting output name: " + sop.getLoadFunc().getClass().getSimpleName());
+				output = output.name(sop.getLoadFunc().getClass().getSimpleName());
+				
 				// Allow more than one to run.
 				if (sop.getParallelismHint() != 0) {
 					output.parallelismHint(sop.getParallelismHint());
@@ -175,7 +180,7 @@ public class Main {
 							output.getOutputFields(), 
 							new TriMakePigTuples(), 
 							output_fields)
-						.project(output_fields);
+						.project(output_fields);				
 				
 				sop_streams.put(sop, output);
 
@@ -194,6 +199,9 @@ public class Main {
 					throw new RuntimeException(e);
 				}
 			} else if (sop.getType() == StormOper.OpType.BASIC_PERSIST || sop.getType() == StormOper.OpType.COMBINE_PERSIST) {
+				System.out.println("Setting output name: " + sop.name());
+				input = input.name(sop.name());
+
 				// We need to encode the key into a value (sans index) to group properly.
 				Fields orig_input_fields = input.getOutputFields();
 				Fields group_key = new Fields(input.getOutputFields().get(0) + "_raw");
@@ -262,8 +270,8 @@ public class Main {
 			
 			sop_streams.put(sop, output);
 			
-			System.out.println("input fields: " + input.getOutputFields());
-			System.out.println("output fields: " + output.getOutputFields());
+			System.out.println(sop.name() + " input fields: " + input.getOutputFields());
+			System.out.println(sop.name() + " output fields: " + output.getOutputFields());
 		}
 	};
 	
@@ -329,7 +337,6 @@ public class Main {
 	
 	public void launch() throws AlreadyAliveException, InvalidTopologyException {
 		String topology_name = pc.getProperties().getProperty("pig.streaming.topology.name", "PigStorm-" + pc.getLastAlias());
-		
 		
 		if (pc.getProperties().getProperty("pig.streaming.run.test.cluster", "false").equalsIgnoreCase("true")) {
 			log.info("Running test cluster...");

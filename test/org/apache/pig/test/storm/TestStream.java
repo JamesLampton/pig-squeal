@@ -262,7 +262,7 @@ public class TestStream extends TestCase {
     	pig.registerQuery("hist = FOREACH hist_gr GENERATE group AS wc, COUNT(count) AS freq;");
     	pig.registerQuery("hist = FILTER hist BY freq > 0;");
     	    	
-//    	registerStore("hist", output);
+    	registerStore("hist", output);
 //    	registerStore("x", output);
 //    	registerStore("count_gr", output);
 //    	registerStore("count", output);

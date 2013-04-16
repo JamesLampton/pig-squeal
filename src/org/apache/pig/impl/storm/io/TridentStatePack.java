@@ -51,7 +51,7 @@ public class TridentStatePack extends POPackage {
 	public void attachInput(PigNullableWritable k, Iterator<NullableTuple> inp) {
 		if (initialized == false) {
 			initialized = true;
-			s = (MapState) stateFactory.makeState(new HashMap(), 0, 1);
+			s = (MapState) stateFactory.makeState(new HashMap(), null, 0, 1);
 			
 			if (windowOpts == null) {
 				agg = new CombineWrapper(new TriBasicPersist());

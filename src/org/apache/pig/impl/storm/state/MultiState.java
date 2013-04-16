@@ -9,6 +9,8 @@ import java.util.Map.Entry;
 import org.apache.hadoop.io.Writable;
 import org.apache.pig.impl.util.Pair;
 
+import backtype.storm.task.IMetricsContext;
+
 import storm.trident.state.State;
 import storm.trident.state.StateFactory;
 import storm.trident.state.map.IBackingMap;
@@ -74,17 +76,17 @@ public class MultiState implements IBackingMap<IPigIdxState> {
 		}
 		
 		@Override
-		public State makeState(Map conf, int partitionIndex, int numPartitions) {
+		public State makeState(Map conf, IMetricsContext metrics, int partitionIndex, int numPartitions) {
 			MapState def_state = null;
 			if (def_fact != null) {
-				def_state = (MapState) def_fact.makeState(conf, partitionIndex, numPartitions);
+				def_state = (MapState) def_fact.makeState(conf, metrics, partitionIndex, numPartitions);
 			}
 			
 			Map<Integer, MapState> idx_map = new HashMap<Integer, MapState>();
 			
 			ArrayList<MapState> maps = new ArrayList<MapState>();
 			for (StateFactory sf : state_facts) {
-				maps.add((MapState) sf.makeState(conf, partitionIndex, numPartitions));
+				maps.add((MapState) sf.makeState(conf, metrics, partitionIndex, numPartitions));
 			}
 
 			for (Entry<Integer, Integer> ent : opts_map.entrySet()) {

@@ -87,7 +87,7 @@ public class StateWrapper {
 		
 		StateWrapper sw = new StateWrapper(args[0]);
 		StateFactory sf = sw.getStateFactory();
-		MapState s = (MapState) sf.makeState(new HashMap(), 0, 1);
+		MapState s = (MapState) sf.makeState(new HashMap(), null, 0, 1);
 		List<List<Object>> keys = new ArrayList<List<Object>>();
 		
 		ArrayList<Object> key = new ArrayList<Object>();
