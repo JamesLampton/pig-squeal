@@ -61,10 +61,17 @@ public class CombineWrapper implements CombinerAggregator<MapIdxWritable> {
 		return ret;
 	}
 	
-	public static class CombineWrapperState extends MapIdxWritable {
+	public static class CombineWrapperState extends MapIdxWritable<CombineWrapperState> {
 		@Override
 		public List<NullableTuple> getTuples(Text which) {
 			return CombineWrapper.getTuples(this, which);
+		}
+		
+		@Override
+		public List<Pair<List<NullableTuple>, List<NullableTuple>>> getTupleBatches(
+				CombineWrapperState last) {
+			// Last should be null from TriReduce...
+			return CombineWrapper.getTupleBatches(this);
 		}
 		
 		@Override
@@ -141,5 +148,16 @@ public class CombineWrapper implements CombinerAggregator<MapIdxWritable> {
 		Collections.sort(ret, NullableTupleComparator);
 		
 		return ret;
-	}	
+	}
+	
+	public static List<Pair<List<NullableTuple>, List<NullableTuple>>> getTupleBatches(
+			CombineWrapperState cws) {
+		
+		IPigIdxState state = (IPigIdxState) cws.get(CUR);
+		if (state == null) {
+			throw new RuntimeException("No current state in CombineWrapperState: " + cws);
+		}
+
+		return state.getTupleBatches((IPigIdxState) cws.get(LAST));
+	}
 }

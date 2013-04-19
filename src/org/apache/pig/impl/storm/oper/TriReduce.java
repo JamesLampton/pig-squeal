@@ -32,7 +32,10 @@ import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.io.PigNullableWritable;
 import org.apache.pig.impl.plan.VisitorException;
 import org.apache.pig.impl.storm.io.StormPOStoreImpl;
+import org.apache.pig.impl.storm.oper.CombineWrapper.CombineWrapperState;
+import org.apache.pig.impl.storm.state.CombineTupleWritable;
 import org.apache.pig.impl.storm.state.IPigIdxState;
+import org.apache.pig.impl.util.Pair;
 
 import backtype.storm.tuple.Values;
 
@@ -228,37 +231,39 @@ public class TriReduce extends StormBaseFunction {
 		
 		PigNullableWritable key = (PigNullableWritable) tri_tuple.get(0);
 		
-		IPigIdxState s = (IPigIdxState) tri_tuple.get(1);
-	
-//		MapWritable m = (MapWritable) tri_tuple.get(1);
-		FakeCollector fc = new FakeCollector(collector);
-
-		try {
-			// Calculate the previous values.
-			List<NullableTuple> tuples;
-			tuples = s.getTuples(CombineWrapper.LAST);
-			if (tuples != null) {
-				runReduce(key, tuples, fc);
-			}
-
-			//		System.out.println("TriReduce |last_input|: " + ((tuples == null) ? 0 : tuples.size()) + " |last_output| : " + fc.last_res.size());
-			//		if (tuples != null) {
-			//			System.out.println("last_input: " + tuples);
-			//		}
-			//		System.out.println("last_output: " + fc.last_res);
-
-			// Calculate the current values.
-			tuples = s.getTuples(CombineWrapper.CUR);
-			fc.switchToCur();
-			runReduce(key, tuples, fc);
-		} catch (Exception e) {
-			throw new RuntimeException("Error processing: " + tri_tuple, e);
-		}
+		CombineWrapperState cw = (CombineWrapperState) tri_tuple.get(1);
 		
-//		System.out.println("TriReduce |cur_input|: " + tuples.size() + " |cur_output| : " + fc.cur_res.size());
+		for (Pair<List<NullableTuple>, List<NullableTuple>> p : cw.getTupleBatches(null)) {
+			
+			FakeCollector fc = new FakeCollector(collector);
 
-		// Emit positive and negative values.
-		fc.emitValues();
+			try {
+				// Calculate the previous values.
+				List<NullableTuple> tuples;
+				tuples = p.first;
+				if (tuples != null) {
+					runReduce(key, tuples, fc);
+				}
+
+				//		System.out.println("TriReduce |last_input|: " + ((tuples == null) ? 0 : tuples.size()) + " |last_output| : " + fc.last_res.size());
+				//		if (tuples != null) {
+				//			System.out.println("last_input: " + tuples);
+				//		}
+				//		System.out.println("last_output: " + fc.last_res);
+
+				// Calculate the current values.
+				tuples = p.second;
+				fc.switchToCur();
+				runReduce(key, tuples, fc);
+			} catch (Exception e) {
+				throw new RuntimeException("Error processing: " + tri_tuple, e);
+			}
+			
+//			System.out.println("TriReduce |cur_input|: " + tuples.size() + " |cur_output| : " + fc.cur_res.size());
+
+			// Emit positive and negative values.
+			fc.emitValues();
+		}
 	}
 
 	public void runReduce(PigNullableWritable key, List<NullableTuple> tuples, TridentCollector collector) {

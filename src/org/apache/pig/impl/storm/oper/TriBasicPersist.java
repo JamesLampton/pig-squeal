@@ -10,6 +10,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.storm.oper.TriWindowCombinePersist.WindowCombineState;
+import org.apache.pig.impl.storm.state.CombineTupleWritable;
 import org.apache.pig.impl.storm.state.IPigIdxState;
 import org.apache.pig.impl.storm.state.MapIdxWritable;
 import org.apache.pig.impl.util.Pair;
@@ -74,12 +75,7 @@ public class TriBasicPersist implements CombinerAggregator<MapIdxWritable> {
 		return ret;
 	}
 	
-	public static class TriBasicPersistState extends MapIdxWritable {
-		@Override
-		public List<NullableTuple> getTuples(Text which) {
-			return TriBasicPersist.getTuples(this);
-		}
-		
+	public static class TriBasicPersistState extends MapIdxWritable<TriBasicPersistState> {
 		@Override
 		public Pair<Writable, List<Writable>> separate(List<Integer[]> bins) {
 			MapIdxWritable def = null; // = new TriBasicPersistState();
@@ -123,6 +119,30 @@ public class TriBasicPersist implements CombinerAggregator<MapIdxWritable> {
 		@Override
 		public void merge(IPigIdxState other) {
 			putAll(((TriBasicPersistState)other));
+		}
+
+		@Override
+		public List<NullableTuple> getTuples(Text which) {
+			return TriBasicPersist.getTuples(this);
+		}
+		
+		@Override
+		public List<Pair<List<NullableTuple>, List<NullableTuple>>> getTupleBatches(
+				TriBasicPersistState lastState) {
+		
+			List<NullableTuple> first = null;
+			if (lastState != null) {
+				first = lastState.getTuples(null);
+			}
+			List<NullableTuple> second = getTuples(null);
+
+			Pair<List<NullableTuple>, List<NullableTuple>> p = 
+					new Pair<List<NullableTuple>, List<NullableTuple>>(first, second);
+
+			ArrayList<Pair<List<NullableTuple>, List<NullableTuple>>> ret = 
+					new ArrayList<Pair<List<NullableTuple>, List<NullableTuple>>>();
+			ret.add(p);
+			return ret;			
 		}
 	}
 

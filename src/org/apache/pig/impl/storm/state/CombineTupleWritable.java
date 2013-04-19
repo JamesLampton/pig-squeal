@@ -15,7 +15,7 @@ import org.apache.pig.impl.util.Pair;
 
 import backtype.storm.utils.WritableUtils;
 
-public class CombineTupleWritable implements Writable, IPigIdxState {
+public class CombineTupleWritable implements Writable, IPigIdxState<CombineTupleWritable> {
 	private List<Writable> values;
 	
 	public CombineTupleWritable() {
@@ -80,5 +80,23 @@ public class CombineTupleWritable implements Writable, IPigIdxState {
 	@Override
 	public void merge(IPigIdxState other) {
 		throw new RuntimeException("Not implemented for combined plans.");		
+	}
+
+	@Override
+	public List<Pair<List<NullableTuple>, List<NullableTuple>>> getTupleBatches(
+			CombineTupleWritable lastState) {
+		List<NullableTuple> first = null;
+		if (lastState != null) {
+			first = lastState.getTuples(null);
+		}
+		List<NullableTuple> second = getTuples(null);
+
+		Pair<List<NullableTuple>, List<NullableTuple>> p = 
+				new Pair<List<NullableTuple>, List<NullableTuple>>(first, second);
+		
+		ArrayList<Pair<List<NullableTuple>, List<NullableTuple>>> ret = 
+				new ArrayList<Pair<List<NullableTuple>, List<NullableTuple>>>();
+		ret.add(p);
+		return ret;
 	}
 }

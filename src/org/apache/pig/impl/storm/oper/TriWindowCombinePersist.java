@@ -15,7 +15,7 @@ import org.apache.hadoop.io.Writable;
 import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.storm.state.IPigIdxState;
 import org.apache.pig.impl.storm.state.MapIdxWritable;
-import org.apache.pig.impl.storm.state.WindowBuffer;
+import org.apache.pig.impl.storm.state.WindowBundle;
 import org.apache.pig.impl.util.Pair;
 import org.mortbay.util.ajax.JSON;
 
@@ -40,31 +40,71 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapIdxWritabl
 			}
 		}
 	}
-
-	static public List<NullableTuple> getTuples(MapIdxWritable state) {		
-		List<NullableTuple> ret = new ArrayList<NullableTuple>();
+	
+	static Pair<List<NullableTuple>, WindowBundle<NullableTuple>> extractStates(WindowCombineState state) {
+		if (state == null) {
+			return new Pair<List<NullableTuple>, WindowBundle<NullableTuple>>(null, null);
+		}
+		
+		List<NullableTuple> fixed = new ArrayList<NullableTuple>();
+		WindowBundle<NullableTuple> win = null;
 		
 		for (Entry<Writable, Writable> ent : state.entrySet()) {
 			if (ent.getKey().getClass().isAssignableFrom(IntWritable.class)) {
 				// This is a windowed element.
-				WindowBuffer<NullableTuple> w = 
-						(WindowBuffer<NullableTuple>) ent.getValue();
-				ret.addAll(w.getWindow());
+				if (win != null) {
+					// If we have multiple windows on a particular node, I'm not sure how we would
+					// sequence things together given the current implementation.
+					throw new RuntimeException("ERROR: Only one windowed element per group is currently supported.");
+				}
+				
+				win = (WindowBundle<NullableTuple>) ent.getValue();
 			} else {
 				// This is a counted element.
 				int c = ((IntWritable) ent.getValue()).get();
 				NullableTuple v = (NullableTuple) ent.getKey();
-				// If c is negative then we may have seen the inverse tuple for 
-				// a positive tuple we've yet to see.  This will silently consume
-				// them.
-				// FIXME: Or we have a terrible problem...
 				for (int i = 0; i < c; i++) {
-					ret.add(v);
+					fixed.add(v);
 				}
 			}
 		}
 		
-		return ret;
+		return new Pair<List<NullableTuple>, WindowBundle<NullableTuple>>(fixed, win);
+	}
+
+	static List<NullableTuple> mergeOrCopy(List<NullableTuple> to, List<NullableTuple> from) {
+		if (to == null && from == null) {
+			return null;
+		}
+		
+		if (to == null && from != null) {
+			return new ArrayList<NullableTuple>(from);
+		}
+		
+		// to isn't null.
+		if (from != null) {
+			to.addAll(from);
+		}
+		
+		return to;
+	}
+	
+	public static List<Pair<List<NullableTuple>, List<NullableTuple>>> getTupleBatches(
+			WindowCombineState curState, WindowCombineState lastState) {
+		// First, separate the windowed portions.
+		Pair<List<NullableTuple>, WindowBundle<NullableTuple>> lastStuff = extractStates(lastState);
+		Pair<List<NullableTuple>, WindowBundle<NullableTuple>> curStuff = extractStates(curState);
+		
+		// Now build the pairs.
+		List<Pair<List<NullableTuple>, List<NullableTuple>>> arr = 
+				WindowBundle.getTuples(lastStuff.second, curStuff.second); 
+		for (Pair<List<NullableTuple>, List<NullableTuple>> p_win : arr) {
+			// Expand each list by the static portion.
+			p_win.first = mergeOrCopy(p_win.first, lastStuff.first);
+			p_win.second = mergeOrCopy(p_win.second, curStuff.first);
+		}
+		
+		return arr;
 	}
 	
 	void addTuple(MapIdxWritable s, NullableTuple t, int c) {
@@ -74,8 +114,8 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapIdxWritabl
 			IntWritable key_tmp = new IntWritable(idx);
 
 			// Pull the window.
-			WindowBuffer<NullableTuple> w = 
-					(WindowBuffer<NullableTuple>) s.get(key_tmp);
+			WindowBundle<NullableTuple> w = 
+					(WindowBundle<NullableTuple>) s.get(key_tmp);
 			
 			/*
 			 * FIXME: If we get the negative before the positive, this won't work.
@@ -85,7 +125,7 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapIdxWritabl
 			 */
 			if (c < 0) {
 				// Remove the item for negative items.
-				w.removeItem(t);
+				w.remove(t);
 			} else {
 				// Add it otherwise.
 				w.push(t);
@@ -141,14 +181,15 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapIdxWritabl
 			// See if this is a windowed element.
 			if (ent.getKey() instanceof IntWritable) {
 				// Pull the window.
-				WindowBuffer<NullableTuple> w = 
-						(WindowBuffer<NullableTuple>) into.get(ent.getKey());
+				WindowBundle<NullableTuple> w = 
+						(WindowBundle<NullableTuple>) into.get(ent.getKey());
 				
 				// Merge win2 in to w.
-				WindowBuffer<NullableTuple> w2 = (WindowBuffer<NullableTuple>) ent.getValue(); 
-				for (NullableTuple v : w2.getWindow()) {
-					w.push(v);
-				}
+				WindowBundle<NullableTuple> w2 = (WindowBundle<NullableTuple>) ent.getValue();
+				w.merge(w2);
+				
+				// Remove any aged off windows.
+				w.runAgeoff(System.currentTimeMillis());
 				
 				continue;
 			}
@@ -175,7 +216,7 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapIdxWritabl
 		return ret;
 	}
 	
-	static public class WindowCombineState extends MapIdxWritable {
+	static public class WindowCombineState extends MapIdxWritable<WindowCombineState> {
 		private Map<Integer, Long> settings;
 		
 		// Override default write to track the settings in case
@@ -218,14 +259,9 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapIdxWritabl
 			// Initialize any windows.
 			for (Entry<Integer, Long> ent : windowSettings.entrySet()) {
 				put(new IntWritable(ent.getKey()), 
-						new WindowBuffer<NullableTuple>(
+						new WindowBundle<NullableTuple>(
 								ent.getValue().intValue()));
 			}
-		}
-		
-		@Override
-		public List<NullableTuple> getTuples(Text which) {
-			return TriWindowCombinePersist.getTuples(this);
 		}
 
 		@Override
@@ -278,10 +314,10 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapIdxWritabl
 			for (Entry<Writable, Writable> ent : ((WindowCombineState)other).entrySet()) {
 				if (ent.getKey().getClass().isAssignableFrom(IntWritable.class)) {
 					// This is a windowed element.
-					WindowBuffer<NullableTuple> w = (WindowBuffer<NullableTuple>) ent.getValue();
+					WindowBundle<NullableTuple> w = (WindowBundle<NullableTuple>) ent.getValue();
 					// The windows should have been partitioned, so if we have anything within
 					// replace ours.
-					if (w.size() > 0) {
+					if (!w.isEmpty()) {
 						put(ent.getKey(), ent.getValue());
 					}
 				} else {
@@ -289,6 +325,17 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapIdxWritabl
 					put(ent.getKey(), ent.getValue());
 				}
 			}
+		}
+
+		@Override
+		public List<NullableTuple> getTuples(Text which) {
+			throw new RuntimeException("Not implemented for " + this.getClass().getName());
+		}
+		
+		@Override
+		public List<Pair<List<NullableTuple>, List<NullableTuple>>> getTupleBatches(
+				WindowCombineState lastState) {
+			return TriWindowCombinePersist.getTupleBatches(this, lastState);
 		}
 	}
 	
