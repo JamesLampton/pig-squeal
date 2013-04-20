@@ -51,7 +51,7 @@ public class TriReduce extends StormBaseFunction {
 	private PhysicalOperator leaf;
 	private POPackage pack;
 	private boolean errorInReduce;
-	private boolean windowedInput;
+	private boolean noNegative;
 	private boolean isLeaf;
 	private LinkedList<POStore> stores;
 	private AtomicInteger sign;
@@ -89,10 +89,10 @@ public class TriReduce extends StormBaseFunction {
 		}
 	}
 	
-	public TriReduce(PigContext pc, PhysicalPlan plan, boolean windowedInput, boolean isLeaf) {
+	public TriReduce(PigContext pc, PhysicalPlan plan, boolean noNegative, boolean isLeaf) {
 		super(pc);
 		
-		this.windowedInput = windowedInput;
+		this.noNegative = noNegative;
 		this.isLeaf = isLeaf;
 		this.sign = new AtomicInteger(0);
 		
@@ -215,8 +215,8 @@ public class TriReduce extends StormBaseFunction {
 			// Any values in cur_set go out as "positive" messages.
 			emitSet(cur_res.entrySet(), POS);
 			
-			// Don't emit negative messages for windowed messages.
-			if (windowedInput) {
+			// Don't emit negative messages.
+			if (noNegative) {
 				return;
 			}
 			

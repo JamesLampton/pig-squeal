@@ -95,13 +95,20 @@ public class TriWindowCombinePersist implements CombinerAggregator<MapIdxWritabl
 		Pair<List<NullableTuple>, WindowBundle<NullableTuple>> lastStuff = extractStates(lastState);
 		Pair<List<NullableTuple>, WindowBundle<NullableTuple>> curStuff = extractStates(curState);
 		
+//		System.out.println("getTupleBatches: last: " + lastStuff.first + " " + lastStuff.second);
+//		System.out.println("getTupleBatches: cur: " + curStuff.first + " " + curStuff.second);
+		
 		// Now build the pairs.
 		List<Pair<List<NullableTuple>, List<NullableTuple>>> arr = 
 				WindowBundle.getTuples(lastStuff.second, curStuff.second); 
 		for (Pair<List<NullableTuple>, List<NullableTuple>> p_win : arr) {
+//			System.out.println("1 getTupleBatches pair first: " + p_win.first + " ---second: " + p_win.second);
+			
 			// Expand each list by the static portion.
 			p_win.first = mergeOrCopy(p_win.first, lastStuff.first);
 			p_win.second = mergeOrCopy(p_win.second, curStuff.first);
+			
+//			System.out.println("2 getTupleBatches pair first: " + p_win.first + " ---second: " + p_win.second);
 		}
 		
 		return arr;

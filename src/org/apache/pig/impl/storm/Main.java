@@ -262,7 +262,7 @@ public class Main {
 				// Need to reduce
 				output = input.each(
 							input.getOutputFields(), 
-							new TriReduce(pc, sop.getPlan(), (sop.getWindowOptions() == null ? false : true), leaves.contains(sop)), 
+							new TriReduce(pc, sop.getPlan(), false, leaves.contains(sop)), 
 							output_fields
 						).project(output_fields);
 //				output.each(output.getOutputFields(), new Debug());
