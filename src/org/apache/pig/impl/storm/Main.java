@@ -1,5 +1,7 @@
 package org.apache.pig.impl.storm;
 
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.util.ArrayList;
@@ -7,6 +9,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
@@ -44,6 +47,7 @@ import org.apache.pig.impl.storm.plans.StormOper;
 import org.apache.pig.impl.storm.state.CombineTupleWritable;
 import org.apache.pig.impl.util.MultiMap;
 import org.apache.pig.impl.util.ObjectSerializer;
+import org.yaml.snakeyaml.Yaml;
 
 import backtype.storm.Config;
 import backtype.storm.LocalCluster;
@@ -349,6 +353,21 @@ public class Main {
 			log.info("Back from test cluster.");
 		} else {			
 			Config conf = new Config();
+			
+			String extraConf = pc.getProperties().getProperty("pig.streaming.extra.conf", null);
+			if (extraConf != null) {
+				// Load the configuration file.
+				Yaml yaml = new Yaml();
+				FileReader fr;
+				try {
+					fr = new FileReader(extraConf);
+					Map<String, Object> m = (Map<String, Object>) yaml.load(fr);
+					conf.putAll(m);
+					fr.close();
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}	
+			}
 			
 			int workers = Integer.parseInt(pc.getProperties().getProperty("pig.streaming.workers", "4"));
 			conf.setNumWorkers(workers);
