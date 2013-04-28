@@ -181,8 +181,8 @@ public class Main {
 				
 				// Add the conversion routine to the end to switch from Storm to Pig tuples.
 				output = output.each(
-							output.getOutputFields(), 
-							new TriMakePigTuples(), 
+							output.getOutputFields(),
+							sop.getTupleConverter(),
 							output_fields)
 						.project(output_fields);				
 				

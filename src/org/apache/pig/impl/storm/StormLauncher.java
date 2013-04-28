@@ -109,6 +109,10 @@ public class StormLauncher extends Launcher {
 			new ReplJoinFileFixer(sp).convert();
 		}
 
+		if (pc.getProperties().getProperty("pig.streaming.topology.name", null) == null) {
+			pc.getProperties().setProperty("pig.streaming.topology.name", "PigStorm-" + php.getLeaves().get(0).getAlias());
+		}
+		
 		// Encode the plan into the context for later retrieval.
 		log.info("Stashing the Storm plan into PigContext for retrieval by the topology runner...");
 		pc.getProperties().setProperty(PLANKEY, ObjectSerializer.serialize(sp));

@@ -28,8 +28,10 @@ import org.apache.pig.data.Tuple;
 import org.apache.pig.data.TupleFactory;
 import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.logicalLayer.schema.Schema;
+import org.apache.pig.impl.storm.oper.TriMakePigTuples;
 import org.mortbay.util.ajax.JSON;
 
+import storm.trident.operation.BaseFunction;
 import storm.trident.tuple.TridentTuple;
 
 import backtype.storm.generated.StreamInfo;
@@ -228,4 +230,7 @@ public class SpoutWrapper extends LoadFunc implements LoadMetadata, LoadCaster {
 		return conv.bytesToBag(b, fieldSchema);
 	}
 
+	public Class<? extends BaseFunction> getTupleConverter() {
+		return TriMakePigTuples.class;
+	}
 }

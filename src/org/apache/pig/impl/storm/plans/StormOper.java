@@ -15,6 +15,8 @@ import org.apache.pig.impl.storm.state.StateWrapper;
 import backtype.storm.topology.IRichSpout;
 import backtype.storm.tuple.Fields;
 
+import storm.trident.operation.BaseFunction;
+import storm.trident.operation.Function;
 import storm.trident.state.StateFactory;
 import storm.trident.testing.LRUMemoryMapState;
 
@@ -54,6 +56,7 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 	private String windowOpts;
 	private Object parall;
 	private int parallelismHint;
+	private String tupleConverterKlass;
 
 	public void setSpout(IRichSpout spout) {
 		this.spout = spout;
@@ -131,5 +134,17 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 
 	public static String getWindowOpts(PigContext pc, String alias) {
 		return pc.getProperties().getProperty(alias + "_window_opts");
+	}
+
+	public void setTupleConverter(Class<? extends BaseFunction> tupleConverter) {
+		this.tupleConverterKlass = tupleConverter.getName();
+	}
+
+	public Function getTupleConverter() {
+		try {
+			return (Function) Class.forName(this.tupleConverterKlass).newInstance();
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 }

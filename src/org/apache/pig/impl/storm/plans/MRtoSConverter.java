@@ -152,6 +152,7 @@ public class MRtoSConverter extends MROpPlanVisitor {
 				SpoutWrapper sw = ((SpoutWrapper)pl.getLoadFunc());
 				spout.setParallelismHint(sw.getParallelismHint());
 				spout.setSpout(sw.getSpout());
+				spout.setTupleConverter(sw.getTupleConverter());
 				splan.add(spout);
 				splan.addPLSpoutLink(spout, pl);
 				rootMap.put(fn, spout);
