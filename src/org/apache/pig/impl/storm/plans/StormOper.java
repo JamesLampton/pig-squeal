@@ -54,9 +54,9 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 	IRichSpout spout;
 	public boolean isCombined;
 	private String windowOpts;
-	private Object parall;
-	private int parallelismHint;
+	private int parallelismHint = 0;
 	private String tupleConverterKlass;
+	private boolean shuffleBefore;
 
 	public void setSpout(IRichSpout spout) {
 		this.spout = spout;
@@ -146,5 +146,13 @@ public class StormOper extends Operator<SOpPlanVisitor> {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
+	}
+
+	public void shuffleBefore(boolean b) {
+		this.shuffleBefore = b;
+	}
+
+	public boolean getShuffleBefore() {
+		return this.shuffleBefore;
 	}
 }

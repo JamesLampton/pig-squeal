@@ -120,6 +120,11 @@ public class Main {
 					// Probably a static load.
 					continue;
 				}
+				
+				if (sop.getShuffleBefore()) {
+					input = input.shuffle();
+				}
+				
 				System.out.println("Setting output name: " + sop.name());
 				input = input.name(sop.name());
 				
@@ -138,6 +143,10 @@ public class Main {
 							output_fields
 						).project(output_fields);
 				outputs.add(output);
+				
+				if (sop.getParallelismHint() != 0) {
+					output.parallelismHint(sop.getParallelismHint());
+				}
 			}
 			
 			if (outputs.size() == 1) {

@@ -132,6 +132,18 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		StormOper mo = getSOp(StormOper.OpType.MAP, getAlias(mr.mapPlan, false));
 		mo.mapKeyType = mr.mapKeyType;
 		splan.add(mo);
+		
+		// Determine if we need to shuffle before this operator.
+		String mapAlias = getAlias(mr.mapPlan, true);
+		System.out.println("Checking " + mapAlias + " for shuffle or parallelism constraints...");
+		if (pc.getProperties().getProperty(mapAlias + "_shuffleBefore", "false").equalsIgnoreCase("true")) {
+			mo.shuffleBefore(true);
+		}
+		
+		// Also, pull a parallelism.
+		if (pc.getProperties().getProperty(mapAlias + "_parallel", null) != null) {
+			mo.setParallelismHint(Integer.parseInt(pc.getProperties().getProperty(mapAlias + "_parallel")));
+		}
 
 		// Look for the input
 		for (PhysicalOperator po : mr.mapPlan.getRoots()) {
