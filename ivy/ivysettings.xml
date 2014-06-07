@@ -46,6 +46,7 @@
     <ibiblio name="jboss-maven2" root="${repo.jboss.org}" pattern="${maven2.pattern.ext}" m2compatible="true"/>
     <ibiblio name="apache-snapshots" root="${repo.apache.snapshots}" pattern="${snapshot.pattern}"
          checkmodified="true" changingPattern=".*SNAPSHOT" m2compatible="true"/>
+    <ibiblio name="clojars" root="http://clojars.org/repo" m2compatible="true"/>
     <filesystem name="fs" m2compatible="true" checkconsistency="false" force="${force-resolve}"
          checkmodified="true" changingPattern=".*SNAPSHOT">
       <artifact pattern="${repo.dir}/${maven2.pattern.ext}"/>
@@ -58,6 +59,7 @@
       <resolver ref="maven2"/>
       <resolver ref="jboss-maven2"/>
       <resolver ref="apache-snapshots"/>
+      <resolver ref="clojars"/>
     </chain>
     <chain name="default" dual="true" checkmodified="true">
       <resolver ref="internal"/>

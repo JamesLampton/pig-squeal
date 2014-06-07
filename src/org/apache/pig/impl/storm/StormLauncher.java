@@ -13,14 +13,15 @@ import java.util.zip.ZipEntry;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.pig.ExecType;
 import org.apache.pig.PigRunner.ReturnCode;
+import org.apache.pig.backend.BackendException;
 import org.apache.pig.backend.datastorage.ContainerDescriptor;
 import org.apache.pig.backend.datastorage.DataStorage;
 import org.apache.pig.backend.datastorage.ElementDescriptor;
 import org.apache.pig.backend.executionengine.ExecException;
-import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.JobCreationException;
-import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.Launcher;
+import org.apache.pig.backend.hadoop.executionengine.Launcher;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.MapReduceLauncher;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.DotMRPrinter;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.plans.MROperPlan;
@@ -65,7 +66,7 @@ public class StormLauncher extends Launcher {
 	@Override
 	public PigStats launchPig(PhysicalPlan php, String grpName, PigContext pc)
 			throws PlanException, VisitorException, IOException, ExecException,
-			JobCreationException, Exception {
+			Exception {
 
 		log.trace("Entering StormLauncher.launchPig");
 
@@ -212,5 +213,18 @@ public class StormLauncher extends Launcher {
 		converter.convert();
 		
 		return converter.getSPlan();
+	}
+
+	@Override
+	public void kill() throws BackendException {
+		// TODO Auto-generated method stub
+		// Not really necessary for a streaming job...
+	}
+
+	@Override
+	public void killJob(String jobID, Configuration conf)
+			throws BackendException {
+		// TODO Auto-generated method stub
+		// Not really necessary for a streaming job...
 	}
 }

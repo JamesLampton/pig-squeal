@@ -325,7 +325,7 @@
                 <source path="${src.shims.dir}"/>
                 <source path="${src.shims.test.dir}"/>
                 <source path="tutorial/src"/>
-                <source path="${test.src.dir}" excluding="e2e/pig/udfs/java/|resources/"/>
+                <source path="${test.src.dir}" excluding="e2e/pig/udfs/java/|resources/|perf/"/>
                 <output path="${build.dir.eclipse-main-classes}" />
                 <library pathref="eclipse.classpath" exported="true" />
                 <!--library pathref="classpath" exported="false"/-->

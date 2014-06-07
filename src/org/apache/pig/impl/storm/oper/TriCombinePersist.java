@@ -54,7 +54,7 @@ public class TriCombinePersist implements CombinerAggregator<CombineTupleWritabl
 		ArrayList<CombineTupleWritable> ret = new ArrayList<CombineTupleWritable>();
 		
 		try {
-            Result res = pack.getNext(DUMMYTUPLE);
+            Result res = pack.getNextTuple();
             if(res.returnStatus==POStatus.STATUS_OK){
                 Tuple packRes = (Tuple)res.result;
                                 
@@ -68,7 +68,7 @@ public class TriCombinePersist implements CombinerAggregator<CombineTupleWritabl
                     roots[i].attachInput(packRes);
                 }
                 while(true){
-                    Result redRes = leaf.getNext(DUMMYTUPLE);
+                    Result redRes = leaf.getNextTuple();
                     
                     if(redRes.returnStatus==POStatus.STATUS_OK){
                         Tuple tuple = (Tuple)redRes.result;

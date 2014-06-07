@@ -2,6 +2,8 @@ package org.apache.pig.impl.storm.io;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,11 +31,11 @@ import org.apache.pig.data.TupleFactory;
 import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.logicalLayer.schema.Schema;
 import org.apache.pig.impl.storm.oper.TriMakePigTuples;
+import org.joda.time.DateTime;
 import org.mortbay.util.ajax.JSON;
 
 import storm.trident.operation.BaseFunction;
 import storm.trident.tuple.TridentTuple;
-
 import backtype.storm.generated.StreamInfo;
 import backtype.storm.spout.ISpout;
 import backtype.storm.topology.IRichSpout;
@@ -207,12 +209,6 @@ public class SpoutWrapper extends LoadFunc implements LoadMetadata, LoadCaster {
 	}
 
 	@Override
-	@Deprecated
-	public Map<String, Object> bytesToMap(byte[] b) throws IOException {
-		return conv.bytesToMap(b);
-	}
-
-	@Override
 	public Map<String, Object> bytesToMap(byte[] b,
 			ResourceFieldSchema fieldSchema) throws IOException {
 		return conv.bytesToMap(b, fieldSchema);
@@ -229,8 +225,25 @@ public class SpoutWrapper extends LoadFunc implements LoadMetadata, LoadCaster {
 			throws IOException {
 		return conv.bytesToBag(b, fieldSchema);
 	}
+	
+	@Override
+	public DateTime bytesToDateTime(byte[] b) throws IOException {
+		return conv.bytesToDateTime(b);
+	}
+
+	@Override
+	public BigInteger bytesToBigInteger(byte[] b) throws IOException {
+		return conv.bytesToBigInteger(b);
+	}
+
+	@Override
+	public BigDecimal bytesToBigDecimal(byte[] b) throws IOException {
+		return conv.bytesToBigDecimal(b);
+	}
 
 	public Class<? extends BaseFunction> getTupleConverter() {
 		return TriMakePigTuples.class;
 	}
+
+
 }

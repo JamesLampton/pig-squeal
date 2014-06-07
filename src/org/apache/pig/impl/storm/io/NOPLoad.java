@@ -106,7 +106,7 @@ public class NOPLoad extends POLoad {
 	}
 
 	@Override
-    public Result getNext(Tuple t) throws ExecException {
+    public Result getNextTuple() throws ExecException {
 		Result res = new Result();
 		res.returnStatus = POStatus.STATUS_EOP;
 		return res;

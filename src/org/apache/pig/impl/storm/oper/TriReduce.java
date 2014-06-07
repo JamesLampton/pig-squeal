@@ -21,7 +21,6 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.POStatus;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.PhysicalOperator;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.Result;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhysicalPlan;
-import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POJoinPackage;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POPackage;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.util.PlanHelper;
@@ -108,7 +107,7 @@ public class TriReduce extends StormBaseFunction {
 		if (leaf.getClass().isAssignableFrom(POStore.class)) {
 			if (isLeaf) {
 				try {
-					stores = PlanHelper.getStores(plan);
+					stores = PlanHelper.getPhysicalOperators(plan, POStore.class);
 				} catch (VisitorException e) {
 					throw new RuntimeException(e);
 				}	
@@ -197,7 +196,7 @@ public class TriReduce extends StormBaseFunction {
 //								System.out.println("emitSet: " + ent.getKey());
 								Tuple tup = (Tuple) ent.getKey();
 								store.attachInput(tup);
-								store.getNext(DUMMYTUPLE);
+								store.getNextTuple();
 							}
 						}
 												
@@ -269,7 +268,7 @@ public class TriReduce extends StormBaseFunction {
 	public void runReduce(PigNullableWritable key, List<NullableTuple> tuples, TridentCollector collector) {
 		try {
 			pack.attachInput(key, tuples.iterator());
-			if (pack instanceof POJoinPackage)
+			if (pack instanceof POPackage)
 			{
 				while (true)
 				{
@@ -288,7 +287,7 @@ public class TriReduce extends StormBaseFunction {
 	}
 	
 	public boolean processOnePackageOutput(TridentCollector collector) throws ExecException  {
-        Result res = pack.getNext(DUMMYTUPLE);
+        Result res = pack.getNextTuple();
         if(res.returnStatus==POStatus.STATUS_OK){
             Tuple packRes = (Tuple)res.result;
             
@@ -328,7 +327,7 @@ public class TriReduce extends StormBaseFunction {
         
         while(true)
         {
-            Result redRes = leaf.getNext(DUMMYTUPLE);
+            Result redRes = leaf.getNextTuple();
             if(redRes.returnStatus==POStatus.STATUS_OK){
                 collector.emit(new Values(null, (Tuple)redRes.result));
                 continue;

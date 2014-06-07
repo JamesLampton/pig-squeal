@@ -16,9 +16,9 @@ import org.apache.pig.backend.hadoop.executionengine.physicalLayer.PhysicalOpera
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhyPlanVisitor;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhysicalPlan;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POFRJoin;
-import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POJoinPackage;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLocalRearrange;
+import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POPackage;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POUnion;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.util.PlanHelper;
@@ -83,7 +83,8 @@ public class MRtoSConverter extends MROpPlanVisitor {
 //		System.out.println(useRoots + " Roots: " + p.getRoots() + " Leaves: " + p.getLeaves());
 		if (useRoots) {
 			PhysicalOperator root = p.getRoots().get(0);
-			if (root instanceof POJoinPackage) {
+			// TODO: Need to determine if this still works.
+			if (root instanceof POPackage) {
 				root = p.getSuccessors(root).get(0);
 			}
 			return (root == null) ? null : root.getAlias();
@@ -101,14 +102,14 @@ public class MRtoSConverter extends MROpPlanVisitor {
 	
 	public void updateUDFs(PhysicalPlan plan) {		
 		try {
-			for (POStore store : PlanHelper.getStores(plan)) {
+			for (POStore store : PlanHelper.getPhysicalOperators(plan, POStore.class)) {
 				if (store.getStoreFunc() instanceof ISignStore) {
 					ISignStore sf = (ISignStore) store.getStoreFunc();
 					splan.UDFs.addAll(sf.getUDFs());
 				}
 			}
 		
-			for (POLoad load : PlanHelper.getLoads(plan)) {
+			for (POLoad load : PlanHelper.getPhysicalOperators(plan, POLoad.class)) {
 				if (load.getLoadFunc() instanceof SpoutWrapper) {
 					SpoutWrapper lf = (SpoutWrapper) load.getLoadFunc();
 					// Add the spout's UDF so it gets picked up by the Jar.
@@ -205,7 +206,7 @@ public class MRtoSConverter extends MROpPlanVisitor {
 		StormOper po;
 		// See if we're a window.
 		String red_alias;
-		if (mr.reducePlan.getRoots().get(0) instanceof POJoinPackage) {
+		if (mr.reducePlan.getRoots().get(0) instanceof POPackage) {
 			red_alias = getAlias(mr.mapPlan, false);
 		} else {
 			red_alias = (mr.combinePlan.size() > 0) ? getAlias(mr.combinePlan, false) : getAlias(mr.reducePlan, true);

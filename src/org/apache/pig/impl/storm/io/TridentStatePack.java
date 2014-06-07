@@ -101,7 +101,7 @@ public class TridentStatePack extends POPackage {
 	}
 	
 	@Override
-	public Result getNext(Tuple t) throws ExecException {
+	public Result getNextTuple() throws ExecException {
 		// All the trickery is in attach input.
 		Result res = new Result();
 		res.returnStatus = POStatus.STATUS_EOP;

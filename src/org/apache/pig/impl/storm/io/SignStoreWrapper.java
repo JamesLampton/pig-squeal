@@ -100,4 +100,9 @@ public class SignStoreWrapper implements StoreFuncInterface, ISignStore {
 		wrapped.cleanupOnFailure(location, job);
 	}
 
+	@Override
+	public void cleanupOnSuccess(String location, Job job) throws IOException {
+		wrapped.cleanupOnSuccess(location, job);
+	}
+
 }

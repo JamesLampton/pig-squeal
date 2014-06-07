@@ -102,7 +102,7 @@ public class TriMapFunc extends StormBaseFunction {
 			this.mapKeyType = mapKeyType;
 			
 			try {
-				stores = PlanHelper.getStores(plan);
+				stores = PlanHelper.getPhysicalOperators(plan, POStore.class);
 			} catch (VisitorException e) {
 				throw new RuntimeException(e);
 			}
@@ -159,7 +159,7 @@ public class TriMapFunc extends StormBaseFunction {
 		
 		void runPipeLine(TridentCollector collector, Integer tive) throws ExecException {
 			while(true){
-	            Result res = leaf.getNext(DUMMYTUPLE);
+	            Result res = leaf.getNextTuple();
 	            if(res.returnStatus==POStatus.STATUS_OK){
 	            	
 	                collect(collector, (Tuple)res.result, tive);

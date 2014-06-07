@@ -251,7 +251,7 @@ public class StaticPlanFixer extends MROpPlanVisitor {
 		TridentStatePack pack = new TridentStatePack(
 				new OperatorKey(scope, NodeIdGenerator.getGenerator().getNextNodeId(scope)),
 				sf, StormOper.getWindowOpts(pc, alias));
-		pack.setKeyType(mr.mapKeyType);
+//		pack.setKeyType(mr.mapKeyType); FIXME: Was this replaced by something else?
 		state_mr.reducePlan.add(pack);
 		
 		// Clone the necessary UDFs.
