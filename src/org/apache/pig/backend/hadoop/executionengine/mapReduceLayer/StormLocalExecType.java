@@ -29,45 +29,13 @@ import org.apache.pig.impl.storm.StormExecutionEngine;
  * MRExecType is the ExecType for distributed mode in Hadoop Mapreduce.
  *
  */
-public class StormExecType implements ExecType {
+public class StormLocalExecType extends StormExecType {
 
     private static final long serialVersionUID = 1L;
-    private static final String[] modes = { "STORM" };
-
-    @Override
-    public boolean accepts(Properties properties) {
-        String execTypeSpecified = properties.getProperty("exectype", "")
-                .toUpperCase();
-        for (String mode : modes) {
-            if (execTypeSpecified.equals(mode)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    public ExecutionEngine getExecutionEngine(PigContext pigContext) {
-    	// Much easier than my last patch...
-        return new StormExecutionEngine(pigContext);
-    }
-
-    @Override
-    public Class<? extends ExecutionEngine> getExecutionEngineClass() {
-    	return StormExecutionEngine.class;
-    }
+    private static final String[] modes = { "STORM-LOCAL" };
 
     @Override
     public boolean isLocal() {
-        return false;
-    }
-
-    @Override
-    public String name() {
-        return modes[0];
-    }
-    
-    public String toString() {
-        return name();
+        return true;
     }
 }

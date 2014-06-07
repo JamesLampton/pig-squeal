@@ -25,6 +25,7 @@ import org.apache.pig.backend.executionengine.ExecutionEngine;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.LocalExecType;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.MRExecType;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.StormExecType;
+import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.StormLocalExecType;
 import org.apache.pig.classification.InterfaceAudience;
 import org.apache.pig.classification.InterfaceStability;
 import org.apache.pig.impl.PigContext;
@@ -43,7 +44,6 @@ public interface ExecType extends Serializable {
 
     public static final ExecType LOCAL = new LocalExecType();
     public static final ExecType MAPREDUCE = new MRExecType();
-    public static final ExecType STORM = new StormExecType();
 
     /**
      * An ExecType is selected based off the Properties for the given script.

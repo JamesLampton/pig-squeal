@@ -20,16 +20,13 @@ package org.apache.pig.test.storm;
 
 import org.apache.pig.ExecType;
 import org.apache.pig.PigServer;
-
 import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
-
 import org.apache.pig.impl.io.FileLocalizer;
 import org.apache.pig.test.MiniCluster;
 import org.apache.pig.test.Util;
-
 import org.apache.pig.backend.executionengine.ExecException;
-
+import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.StormExecType;
 import org.json.simple.JSONValue;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -57,11 +54,10 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 
 import storm.trident.testing.LRUMemoryMapState;
-
 import backtype.storm.testing.FixedTupleSpout;
 import backtype.storm.topology.base.BaseRichSpout;
 /*
- * Testcase aimed at testing pig with large file sizes and filter and group functions
+ * Testcase aimed at testing Squeal.
 */
 @RunWith(JUnit4.class)
 public class TestStream extends TestCase {
@@ -100,7 +96,8 @@ public class TestStream extends TestCase {
     		cluster = MiniCluster.buildCluster();
     		// Write out a stop list.    	
     		Util.createInputFile(cluster, STOPWORDS_FILE, STOPWORDS);
-        	pig = new PigServer(ExecType.STORM, cluster.getProperties());
+//    		pig = new PigServer(ExecType.STORM, cluster.getProperties());
+        	pig = new PigServer(new StormExecType(), cluster.getProperties());
     	} else {
         	pig = new PigServer("storm-local");
 //        	pig = new PigServer("local");
@@ -273,7 +270,7 @@ DEBUG: (6,2,1)
 //    	registerStore("count_gr", output);
 //    	registerStore("count", output);
     	
-//    	explain("hist");
+    	explain("hist");
     }
 
     @Test
