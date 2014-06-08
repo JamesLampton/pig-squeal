@@ -407,10 +407,12 @@
     <dependency org="com.twitter" name="parquet-pig-bundle" rev="${parquet-pig-bundle.version}" conf="compile->master"/>
 
     <!-- For Squeal (Pig on Storm) -->
-    <dependency org="storm" name="storm-core" rev="0.9.0.1" 
-      conf="compile->master" transitive="true"/>
+    <!--dependency org="storm" name="storm-core" rev="0.9.0.1"  -->
+    <!--dependency org="org.apache.storm" name="storm-core" rev="0.9.1-incubating"-->
+    <dependency org="org.apache.storm" name="storm-core" rev="0.9.2-incubating-SNAPSHOT"
+      conf="compile->default"/>
     <dependency org="com.esotericsoftware.kryo" name="kryo" rev="2.17" 
-      conf="compile->master" transitive="true"/>
+      conf="compile->default"/>
 
   </dependencies>
 </ivy-module>

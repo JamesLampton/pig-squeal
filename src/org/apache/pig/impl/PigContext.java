@@ -533,6 +533,12 @@ public class PigContext implements Serializable {
     public ExecutionEngine getExecutionEngine() {
         return executionEngine;
     }
+    
+    public void refreshExecutionEngine() {
+    	if (executionEngine == null) {
+    		executionEngine = execType.getExecutionEngine(this);
+    	}
+    }
 
     public DataStorage getDfs() {
         return dfs;

@@ -57,9 +57,9 @@
     </chain>
     <chain name="external" dual="true">
       <resolver ref="maven2"/>
+      <resolver ref="clojars"/>
       <resolver ref="jboss-maven2"/>
       <resolver ref="apache-snapshots"/>
-      <resolver ref="clojars"/>
     </chain>
     <chain name="default" dual="true" checkmodified="true">
       <resolver ref="internal"/>
