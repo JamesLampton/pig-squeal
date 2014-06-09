@@ -130,7 +130,7 @@ public class TestStream extends TestCase {
     	System.err.print(new String(baos.toByteArray()));    	
     }
     
-//    @Test
+    @Test
     public void testUnion() throws Exception {
     	pig.registerQuery("x = LOAD '/dev/null/0' USING " +
     			"org.apache.pig.backend.storm.io.SpoutWrapper(" +
@@ -150,11 +150,12 @@ public class TestStream extends TestCase {
     	pig.registerQuery("z = UNION x,y;");
     	pig.registerQuery("r = UNION q,z;");
 
+    	// FIXME: Fails.
 //    	pig.registerQuery("STORE r INTO 'fake/pathr';");
 //    	explain("r");
     }
     
-//    @Test
+    @Test
     public void testJoin() throws Exception {
     	String output = "/tmp/testJoin";
     	
@@ -185,7 +186,7 @@ public class TestStream extends TestCase {
     	
     	pig.registerQuery("wordsr = JOIN x BY word, stoplist BY stopword USING 'replicated';");
 //    	explain("wordsr");
-//    	registerStore("wordsr", output);
+    	registerStore("wordsr", output);
 
     	// Tests for mixed static/dynamic stuff.
     	pig.registerQuery("stoplist2 = LOAD '" + STOPWORDS_FILE + "' AS (stopword2:chararray);");
@@ -273,7 +274,7 @@ DEBUG: (6,2,1)
 //    	explain("hist");
     }
 
-//    @Test
+    @Test
     public void testWindow() throws Exception {
     	String output = "/tmp/testWindow";
     	pig.registerQuery("x = LOAD '/dev/null' USING " +

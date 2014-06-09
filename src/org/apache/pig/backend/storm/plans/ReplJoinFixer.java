@@ -170,10 +170,21 @@ public class ReplJoinFixer extends MROpPlanVisitor {
 
 	private void extractReplPlans() throws PlanException {
 //		System.out.println("rFiles: " + rFiles);
-		for (FileSpec f : rFileMap.keySet()) {
-			// Determine the leaf of the plan that produces this file
-			// and move the plan to replPlan.
-			moveToReplPlan(fnToMOP.get(f.getFileName()));
+		for (FileSpec f : rFileMap.keySet()) {			
+			// Determine the leaf of the plan that produces this file.
+			// and change the POStore to non-temp.
+			MapReduceOper mr = fnToMOP.get(f.getFileName());
+			List<PhysicalOperator> leaves = new ArrayList<PhysicalOperator>(mr.mapPlan.size() + mr.reducePlan.size());
+			leaves.addAll(mr.mapPlan.getLeaves());
+			leaves.addAll(mr.reducePlan.getLeaves());
+			for (PhysicalOperator po : leaves) {
+				if (po instanceof POStore) {
+					((POStore) po).setIsTmpStore(false);
+				}
+			}
+			
+			// Move operator to replPlan.
+			moveToReplPlan(mr);
 		}
 	}
 

@@ -77,11 +77,26 @@ public class StormLauncher extends Launcher {
 		if (!pc.getProperties().getProperty("pig.streaming.no.static", "false").equalsIgnoreCase("true") && sp.getStaticPlan() != null) {
 			log.info("Launching Hadoop jobs to perform static calculations...");
 			NoCompileMapReduceLauncher mrlauncher = new NoCompileMapReduceLauncher(sp.getStaticPlan());
+			
+			// Need to change execution engine for the following.
+			ExecType memo_execType = pc.getExecType();
+			if (memo_execType.isLocal()) {
+				// FIXME: We need a fallback exec type, say Tez...
+				pc.setExecType(ExecType.LOCAL);
+			} else {
+				pc.setExecType(ExecType.MAPREDUCE);
+			}
+			pc.refreshExecutionEngine();
+			
 			PigStats ps = mrlauncher.launchPig(php, grpName, pc);
 			if (ps.getReturnCode() != ReturnCode.SUCCESS) {
 				log.warn("Ran into issues running static portion of job, aborting.");
 				return ps;
 			}
+			
+			// Restore the exectype.
+			pc.setExecType(memo_execType);
+			pc.refreshExecutionEngine();
 			
 			// For replicated join files:
 			// The temp files will be deleted by Pig's Main.  The topology will live on
