@@ -376,6 +376,11 @@
             <include name="trevni-avro-${avro.version}.jar"/>
             <include name="snappy-java-${snappy.version}.jar"/>
             <include name="asm*.jar"/>
+            <!-- Squeal dependencies -->
+            <include name="storm*.jar" />
+            <include name="jgrapht-core*.jar" />
+            <include name="kryo*.jar" />
+            <include name="curator*.jar" />
         </patternset>
     </fileset>
 
@@ -397,6 +402,11 @@
             <include name="trevni-avro-${avro.version}.jar"/>
             <include name="snappy-java-${snappy.version}.jar"/>
             <include name="asm*.jar"/>
+            <!-- Squeal dependencies -->
+            <include name="storm*.jar" />
+            <include name="jgrapht-core*.jar" />
+            <include name="kryo*.jar" />
+            <include name="curator*.jar" />
         </patternset>
     </fileset>
 

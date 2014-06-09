@@ -1,8 +1,10 @@
 package org.apache.pig.backend.storm;
 
+import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -354,7 +356,7 @@ public class Main {
 	    conf.registerSerialization(CombineTupleWritable.class, WritableKryoSerializer.class);
 	}
 	
-	public void launch() throws AlreadyAliveException, InvalidTopologyException {
+	public void launch(String jarFile) throws AlreadyAliveException, InvalidTopologyException, IOException {
 		String topology_name = pc.getProperties().getProperty("pig.streaming.topology.name", "PigStorm-" + pc.getLastAlias());
 		
 		if (pc.getProperties().getProperty("pig.streaming.run.test.cluster", "false").equalsIgnoreCase("true")) {
@@ -367,35 +369,60 @@ public class Main {
 			
 			log.info("Back from test cluster.");
 		} else {			
-			Config conf = new Config();
-			
-			String extraConf = pc.getProperties().getProperty("pig.streaming.extra.conf", null);
-			if (extraConf != null) {
-				// Load the configuration file.
-				Yaml yaml = new Yaml();
-				FileReader fr;
-				try {
-					fr = new FileReader(extraConf);
-					Map<String, Object> m = (Map<String, Object>) yaml.load(fr);
-					conf.putAll(m);
-					fr.close();
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}	
-			}
-			
-			int workers = Integer.parseInt(pc.getProperties().getProperty("pig.streaming.workers", "4"));
-			conf.setNumWorkers(workers);
-			int ackers = Integer.parseInt(pc.getProperties().getProperty("pig.streaming.ackers", "1"));
-			conf.setNumAckers(ackers);
-			
-			// Register a Serializer for any Writable.
-			registerSerializer(conf);
-			
-			StormSubmitter submitter = new StormSubmitter();
-			
-			submitter.submitTopology(topology_name, conf, t.build());
+			// Execute "storm jar <jarfile> <this.classname>";
+			String exec = "storm jar " + jarFile + " " + this.getClass().getCanonicalName();
+			System.out.println("Running: " + exec);
+			Process p = Runtime.getRuntime().exec(exec);
+			BufferedReader sout = new BufferedReader(new InputStreamReader(p.getInputStream()));
+	        BufferedReader serr = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+	        
+	        // Pull any stdin/stdout
+	        String line;
+	        while ((line = sout.readLine()) != null) {
+	        	System.out.println(line);
+	        }
+	        while ((line = serr.readLine()) != null) {
+	        	System.err.println(line);
+	        }
+	        
+	        int ret = p.exitValue();
+	        if (ret != 0) {
+	        	throw new RuntimeException("storm jar returned with non-zero status: " + ret);
+	        }
 		}
+	}
+	
+	public void submitTopology() throws AlreadyAliveException, InvalidTopologyException {
+		String topology_name = pc.getProperties().getProperty("pig.streaming.topology.name", "PigStorm-" + pc.getLastAlias());
+		
+		Config conf = new Config();
+		
+		String extraConf = pc.getProperties().getProperty("pig.streaming.extra.conf", null);
+		if (extraConf != null) {
+			// Load the configuration file.
+			Yaml yaml = new Yaml();
+			FileReader fr;
+			try {
+				fr = new FileReader(extraConf);
+				Map<String, Object> m = (Map<String, Object>) yaml.load(fr);
+				conf.putAll(m);
+				fr.close();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}	
+		}
+		
+		int workers = Integer.parseInt(pc.getProperties().getProperty("pig.streaming.workers", "4"));
+		conf.setNumWorkers(workers);
+		int ackers = Integer.parseInt(pc.getProperties().getProperty("pig.streaming.ackers", "1"));
+		conf.setNumAckers(ackers);
+		
+		// Register a Serializer for any Writable.
+		registerSerializer(conf);
+		
+		StormSubmitter submitter = new StormSubmitter();
+		
+		submitter.submitTopology(topology_name, conf, t.build());
 	}
 	
 	Object getStuff(String name) {
@@ -417,7 +444,7 @@ public class Main {
 		/* Create the Pig context */
 		pc = (PigContext) getStuff("pigContext");
 		initFromPigContext(pc);
-		launch();
+		submitTopology();
 	}
 	
 	public static void main(String[] args) throws Exception {

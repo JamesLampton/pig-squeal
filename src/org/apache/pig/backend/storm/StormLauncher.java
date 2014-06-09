@@ -151,23 +151,23 @@ public class StormLauncher extends Launcher {
             JarManager.createJar(fos, sp.UDFs, pc);
             
             log.info("jar file "+submitJarFile.getName()+" created");
+            
+            // Remove the storm plan from the PC
+            pc.getProperties().remove(PLANKEY);
+
+            // Launch the storm task.
+            try {
+            	log.info("Setting up the topology runner...");
+            	Main m = new Main(pc, sp);
+            	log.info("Launching!");
+            	m.launch(submitJarFile.getAbsolutePath());
+            	log.info("Back from launch.");
+            } catch (Exception e) {
+            	throw new RuntimeException(e);
+            }
         }
 		
-		// Remove the storm plan from the PC
-		pc.getProperties().remove(PLANKEY);
 		
-		// Launch the storm task.
-		try {
-			// TODO: Execute "storm jar blah.jar";
-			
-			// For testing purposes.
-			log.info("Setting up the topology runner...");
-			Main m = new Main(pc, sp);
-			log.info("Launching!");
-			m.launch();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
 		
 //		int ret = failed ? ((succJobs != null && succJobs.size() > 0) 
 //				? ReturnCode.PARTIAL_FAILURE
