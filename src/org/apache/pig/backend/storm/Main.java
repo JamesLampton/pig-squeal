@@ -385,7 +385,13 @@ public class Main {
 	        	System.err.println(line);
 	        }
 	        
-	        int ret = p.exitValue();
+	        
+	        int ret;
+			try {
+				ret = p.waitFor();
+			} catch (InterruptedException e) {
+				throw new RuntimeException(e);
+			}
 	        if (ret != 0) {
 	        	throw new RuntimeException("storm jar returned with non-zero status: " + ret);
 	        }

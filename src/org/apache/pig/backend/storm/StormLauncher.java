@@ -147,6 +147,35 @@ public class StormLauncher extends Launcher {
 	            // ensure the job jar is deleted on exit
 	            submitJarFile.deleteOnExit();
 			}
+            
+			// Storm won't have the pig or hadoop jars by default.
+            pc.skipJars.clear();
+            pc.predeployedJars.clear();
+            
+            // Force some hadoopiness into these jars...
+            sp.UDFs.add("org.apache.hadoop.hdfs.DistributedFileSystem");
+            sp.UDFs.add("org.apache.hadoop.conf.Configuration");
+            sp.UDFs.add("org.apache.hadoop.mapreduce.InputFormat");
+            sp.UDFs.add("org.apache.commons.cli.ParseException");
+            sp.UDFs.add("org.apache.commons.configuration.Configuration");
+            sp.UDFs.add("org.apache.hadoop.util.PlatformName");
+            sp.UDFs.add("com.google.protobuf.ServiceException");
+            
+            // Add one or more of these.
+            if (pc.getClassLoader().getResource("hadoop-site.xml") != null) {
+            	pc.addScriptFile("hadoop-site.xml", "hadoop-site.xml");
+            }
+            if (pc.getClassLoader().getResource("core-site.xml") != null) {
+            	pc.addScriptFile("core-site.xml", "core-site.xml");
+            }
+            
+            // META-INF/services/org.apache.hadoop.fs.FileSystem gets hosed above per:
+            // http://stackoverflow.com/questions/17265002/hadoop-no-filesystem-for-scheme-file
+            pc.getProperties().setProperty("fs.hdfs.impl", 
+                    org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
+            pc.getProperties().setProperty("fs.file.impl",
+            		org.apache.hadoop.fs.LocalFileSystem.class.getName());
+            
             FileOutputStream fos = new FileOutputStream(submitJarFile);
             JarManager.createJar(fos, sp.UDFs, pc);
             
