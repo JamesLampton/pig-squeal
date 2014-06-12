@@ -48,7 +48,7 @@ public class StormLocalExecType implements ExecType {
     @Override
     public ExecutionEngine getExecutionEngine(PigContext pigContext) {
     	// Much easier than my last patch...
-        return new StormExecutionEngine(pigContext);
+        return new StormExecutionEngine(pigContext, true);
     }
 
     @Override

@@ -324,6 +324,7 @@ public class Main {
 			cluster.submitTopology(topology_name, conf, t.build());
 			
 			if (wait_time > 0) {
+				log.info("Waiting " + wait_time + " ms for the test cluster to run.");
 				Utils.sleep(wait_time);
 				cluster.killTopology(topology_name);
 				cluster.shutdown();
@@ -357,17 +358,9 @@ public class Main {
 	}
 	
 	public void launch(String jarFile) throws AlreadyAliveException, InvalidTopologyException, IOException {
-		String topology_name = pc.getProperties().getProperty("pig.streaming.topology.name", "PigStorm-" + pc.getLastAlias());
-		
-		if (pc.getProperties().getProperty("pig.streaming.run.test.cluster", "false").equalsIgnoreCase("true")) {
-			log.info("Running test cluster...");
-			
-			boolean debug = pc.getProperties().getProperty("pig.streaming.debug", "false").equalsIgnoreCase("true");
-			int wait_time = Integer.parseInt(pc.getProperties().getProperty("pig.streaming.run.test.cluster.wait_time", "10000"));
-			
-			runTestCluster(topology_name, wait_time, debug);
-			
-			log.info("Back from test cluster.");
+		if (pc.getProperties().getProperty("pig.streaming.run.test.cluster.direct", "false").equalsIgnoreCase("true")) {
+			String topology_name = pc.getProperties().getProperty("pig.streaming.topology.name", "PigStorm-" + pc.getLastAlias());
+			runTestCluster(topology_name);
 		} else {			
 			// Execute "storm jar <jarfile> <this.classname>";
 			String exec = "storm jar " + jarFile + " " + this.getClass().getCanonicalName();
@@ -385,7 +378,6 @@ public class Main {
 	        	System.err.println(line);
 	        }
 	        
-	        
 	        int ret;
 			try {
 				ret = p.waitFor();
@@ -398,9 +390,7 @@ public class Main {
 		}
 	}
 	
-	public void submitTopology() throws AlreadyAliveException, InvalidTopologyException {
-		String topology_name = pc.getProperties().getProperty("pig.streaming.topology.name", "PigStorm-" + pc.getLastAlias());
-		
+	public void submitTopology(String topology_name) throws AlreadyAliveException, InvalidTopologyException {
 		Config conf = new Config();
 		
 		String extraConf = pc.getProperties().getProperty("pig.streaming.extra.conf", null);
@@ -431,6 +421,17 @@ public class Main {
 		submitter.submitTopology(topology_name, conf, t.build());
 	}
 	
+	public void runTestCluster(String topology_name) {
+		log.info("Running test cluster...");
+		
+		boolean debug = pc.getProperties().getProperty("pig.streaming.debug", "false").equalsIgnoreCase("true");
+		int wait_time = Integer.parseInt(pc.getProperties().getProperty("pig.streaming.run.test.cluster.wait_time", "10000"));
+		
+		runTestCluster(topology_name, wait_time, debug);
+		
+		log.info("Back from test cluster.");
+	}
+	
 	Object getStuff(String name) {
 		System.out.println(getClass().getClassLoader().getResource("pigContext"));
 		ObjectInputStream fh;
@@ -450,7 +451,16 @@ public class Main {
 		/* Create the Pig context */
 		pc = (PigContext) getStuff("pigContext");
 		initFromPigContext(pc);
-		submitTopology();
+		
+		String topology_name = pc.getProperties().getProperty("pig.streaming.topology.name", "PigStorm-" + pc.getLastAlias());
+		
+		if (pc.getProperties().getProperty("pig.streaming.run.test.cluster", "false").equalsIgnoreCase("true")) {
+			runTestCluster(topology_name);
+			log.info("Exitting forcefully due to non-terminated threads...");
+			System.exit(0);
+		} else {
+			submitTopology(topology_name);
+		}
 	}
 	
 	public static void main(String[] args) throws Exception {

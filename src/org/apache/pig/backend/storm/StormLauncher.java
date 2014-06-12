@@ -62,7 +62,14 @@ public class StormLauncher extends Launcher {
 			return preCompiledPlan;
 		}
     }
+
+	private boolean run_local;
     
+	public StormLauncher(boolean run_local) {
+		super();
+		this.run_local = run_local;
+	}
+
 	@Override
 	public PigStats launchPig(PhysicalPlan php, String grpName, PigContext pc)
 			throws PlanException, VisitorException, IOException, ExecException,
@@ -175,6 +182,11 @@ public class StormLauncher extends Launcher {
                     org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
             pc.getProperties().setProperty("fs.file.impl",
             		org.apache.hadoop.fs.LocalFileSystem.class.getName());
+
+            // Determine if we need to run a test cluster.
+            if (run_local) {
+            	pc.getProperties().setProperty("pig.streaming.run.test.cluster", "true");
+            }
             
             FileOutputStream fos = new FileOutputStream(submitJarFile);
             JarManager.createJar(fos, sp.UDFs, pc);

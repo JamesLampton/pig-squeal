@@ -13,8 +13,12 @@ import org.apache.pig.tools.pigstats.mapreduce.SimplePigStats;
 public class StormExecutionEngine extends HExecutionEngine {
 
 	public StormExecutionEngine(PigContext pigContext) {
+		this(pigContext, false);
+	}
+
+	public StormExecutionEngine(PigContext pigContext, boolean run_local) {
 		super(pigContext);
-		this.launcher = new StormLauncher();
+		this.launcher = new StormLauncher(run_local);
 	}
 
 	@Override
