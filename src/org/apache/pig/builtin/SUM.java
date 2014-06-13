@@ -20,7 +20,11 @@ package org.apache.pig.builtin;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.pig.AlgebraicInverse;
 import org.apache.pig.FuncSpec;
+import org.apache.pig.PigException;
+import org.apache.pig.backend.executionengine.ExecException;
+import org.apache.pig.builtin.AlgebraicMathBase.KNOWN_OP;
 import org.apache.pig.data.DataType;
 import org.apache.pig.impl.logicalLayer.FrontendException;
 import org.apache.pig.impl.logicalLayer.schema.Schema;
@@ -50,8 +54,12 @@ public class SUM extends AlgebraicByteArrayMathBase {
         setOp(KNOWN_OP.SUM);
     }
 
-    public static class Intermediate extends AlgebraicByteArrayMathBase.Intermediate {
-        @Override
+    public static class Intermediate extends AlgebraicByteArrayMathBase.Intermediate implements AlgebraicInverse  {
+    	public String getInitialInverse() {
+        	return AlgebraicByteArrayMathBase.InverseInitial.class.getName();
+        }
+    	
+    	@Override
         public KNOWN_OP getOp() {
             return KNOWN_OP.SUM;
             }

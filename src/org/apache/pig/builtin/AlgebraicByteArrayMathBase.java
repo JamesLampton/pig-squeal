@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Iterator;
 
 import org.apache.pig.Accumulator;
+import org.apache.pig.AlgebraicInverse;
 import org.apache.pig.EvalFunc;
 import org.apache.pig.PigException;
 import org.apache.pig.backend.executionengine.ExecException;
@@ -46,7 +47,7 @@ public abstract class AlgebraicByteArrayMathBase extends AlgebraicMathBase<Doubl
         default: return null;
         }
     }
-
+    
     private static Double doWork(Double arg1, Double arg2, KNOWN_OP op) {
         if (arg1 == null) {
             return arg2;
@@ -125,13 +126,42 @@ public abstract class AlgebraicByteArrayMathBase extends AlgebraicMathBase<Doubl
                 throw new ExecException("Error executing function on Doubles", errCode, PigException.BUG, e);
             }
         }
+        
     }
 
     @Override
     public String getInitial() {
-        return Initial.class.getName();
+    	if (SUM.class.isAssignableFrom(this.getClass())) {
+    		return InvertableInitial.class.getName();
+    	} 
+    	
+    	return Initial.class.getName();
     }
 
+    // We can only invert SUM, so we just negate the value.
+    static public class InverseInitial extends Initial {
+    	@Override
+        public Tuple exec(Tuple input) throws IOException {
+    		Tuple t = super.exec(input);
+    		
+    		if (t.get(0) != null) {
+    			t.set(0, - (Double) t.get(0));
+    		}
+    		
+    		return t;
+    	}
+    }
+    
+    // This is for SUM...
+    static public class InvertableInitial extends Initial implements AlgebraicInverse {
+
+		@Override
+		public String getInitialInverse() {
+			return InverseInitial.class.getName();
+		}
+    	
+    }
+    
     static public class Initial extends EvalFunc<Tuple> {
         private static TupleFactory tfact = TupleFactory.getInstance();
 

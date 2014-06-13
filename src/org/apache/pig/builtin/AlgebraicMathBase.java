@@ -19,12 +19,16 @@
 package org.apache.pig.builtin;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 
 import org.apache.pig.Algebraic;
+import org.apache.pig.AlgebraicInverse;
 import org.apache.pig.EvalFunc;
 import org.apache.pig.PigException;
 import org.apache.pig.backend.executionengine.ExecException;
 import org.apache.pig.data.DataBag;
+import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.data.TupleFactory;
 
@@ -54,9 +58,62 @@ abstract class AlgebraicMathBase<T> extends EvalFunc<T> implements Algebraic {
 
     @Override
     public String getInitial() {
+    	if (this.getClass().getName().toLowerCase().endsWith("sum")) {
+    		return InvertibleInitial.class.getName();
+    	}
         return Initial.class.getName();
     }
+    
+    static public class InitialInverse extends Initial {
+    	@Override
+        public Tuple exec(Tuple input) throws IOException {
+    		Tuple t = super.exec(input);
+    		if (t.get(0) != null) {
+    			t.set(0, negate(t.get(0)));	
+    		}
+    		
+    		return t;
+    	}
 
+		private Object negate(Object o) throws ExecException {
+			byte dt = DataType.findType(o);
+			Object neg_o = null;
+			
+			switch(dt) {
+			case DataType.BIGDECIMAL:
+				neg_o = ((BigDecimal)o).negate();
+				break;
+			case DataType.BIGINTEGER:
+				neg_o = ((BigInteger)o).negate();
+				break;
+			case DataType.FLOAT:
+				// Fall through.
+			case DataType.DOUBLE:
+				neg_o = new Double(-((Number)o).doubleValue());
+				break;
+			case DataType.INTEGER:
+				// Fall through.
+			case DataType.LONG:
+				neg_o = new Long(-((Number)o).longValue());
+				break;
+			default:
+				int errCode = 2106;
+                throw new ExecException("Unknown data type for object: " + o.getClass().getName(), errCode, PigException.BUG);
+			}
+			
+			return neg_o;
+		}
+    	
+    }
+    
+    static public class InvertibleInitial extends Initial implements AlgebraicInverse {
+
+		@Override
+		public String getInitialInverse() {
+			return InitialInverse.class.getName();
+		}
+    	
+    }
 
     static public class Initial extends EvalFunc<Tuple> {
         private static TupleFactory tfact = TupleFactory.getInstance();

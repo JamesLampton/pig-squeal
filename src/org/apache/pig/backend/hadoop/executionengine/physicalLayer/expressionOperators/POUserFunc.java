@@ -477,12 +477,11 @@ public class POUserFunc extends ExpressionOperator {
     
     public String getInitialNeg() throws ExecException {
         instantiateFunc(origFSpec);
-        if (func instanceof AlgebraicInverse) {
+        if (func instanceof AlgebraicInverse && ((AlgebraicInverse) func).getInitialInverse() != null) {
             return ((AlgebraicInverse) func).getInitialInverse();
         } else {
             int errCode = 2072;
-            String msg = "Attempt to run a non-algebraic function"
-                + " as an algebraic function";
+            String msg = "Unable to retrieve inverse for algebraic function: " + func.getClass().getName();
             throw new ExecException(msg, errCode, PigException.BUG);
         }
     }
