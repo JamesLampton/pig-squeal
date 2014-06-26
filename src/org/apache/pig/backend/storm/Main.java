@@ -1,32 +1,35 @@
 package org.apache.pig.backend.storm;
 
 import java.io.BufferedReader;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
+import java.io.Serializable;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.Semaphore;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.io.Writable;
-import org.apache.pig.backend.hadoop.HDataType;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.PhysicalOperator;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.plans.PhysicalPlan;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POLoad;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POPackage;
+import org.apache.pig.backend.storm.io.SpoutWrapperUtils.LimitedOutstandingInvocationHandler;
 import org.apache.pig.backend.storm.io.WritableKryoSerializer;
 import org.apache.pig.backend.storm.oper.CombineWrapper;
 import org.apache.pig.backend.storm.oper.TriBasicPersist;
 import org.apache.pig.backend.storm.oper.TriCombinePersist;
-import org.apache.pig.backend.storm.oper.TriMakePigTuples;
 import org.apache.pig.backend.storm.oper.TriMapFunc;
 import org.apache.pig.backend.storm.oper.TriReduce;
 import org.apache.pig.backend.storm.oper.TriWindowCombinePersist;
@@ -34,7 +37,6 @@ import org.apache.pig.backend.storm.plans.SOpPlanVisitor;
 import org.apache.pig.backend.storm.plans.SOperPlan;
 import org.apache.pig.backend.storm.plans.StormOper;
 import org.apache.pig.backend.storm.state.CombineTupleWritable;
-import org.apache.pig.data.DataType;
 import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.io.NullableBag;
 import org.apache.pig.impl.io.NullableBooleanWritable;
@@ -56,17 +58,26 @@ import backtype.storm.LocalCluster;
 import backtype.storm.StormSubmitter;
 import backtype.storm.generated.AlreadyAliveException;
 import backtype.storm.generated.InvalidTopologyException;
+import backtype.storm.topology.IRichSpout;
 import backtype.storm.tuple.Fields;
 import backtype.storm.utils.Utils;
 import storm.trident.Stream;
 import storm.trident.TridentState;
 import storm.trident.TridentTopology;
-import storm.trident.fluent.GroupedStream;
-import storm.trident.operation.builtin.Debug;
 import storm.trident.state.map.MapCombinerAggStateUpdater;
 import storm.trident.util.TridentUtils;
 
 public class Main {
+
+	private static final String RUN_TEST_CLUSTER_KEY = "pig.streaming.run.test.cluster";
+	private static final String TEST_CLUSTER_WAIT_TIME_KEY = "pig.streaming.run.test.cluster.wait_time";
+	private static final String ACKERS_COUNT_KEY = "pig.streaming.ackers";
+	private static final String WORKERS_COUNT_KEY = "pig.streaming.workers";
+	private static final String PIG_STREAMING_KEY_PREFIX = "pig.streaming";
+	private static final String RUN_DIRECT_KEY = "pig.streaming.run.test.cluster.direct";
+	private static final String TOPOLOGY_NAME_KEY = "pig.streaming.topology.name";
+	private static final String EXTRA_CONF_KEY = "pig.streaming.extra.conf";
+	private static final String DEBUG_ENABLE_KEY = "pig.streaming.debug";
 	
 	PigContext pc;
 	SOperPlan splan;
@@ -93,8 +104,11 @@ public class Main {
 		t = setupTopology(pc);
 	}
 	
+	
+		
 	class DepWalker extends SOpPlanVisitor {
 
+		private static final String DISABLE_SPOUT_WRAPPER_KEY = "pig.streaming.disable.spout.wraper";
 		private TridentTopology topology;
 		private Map<StormOper, Stream> sop_streams = new HashMap<StormOper, Stream>();
 		private PigContext pc;
@@ -179,7 +193,16 @@ public class Main {
 			Fields output_fields = sop.getOutputFields();
 			
 			if (sop.getType() == StormOper.OpType.SPOUT) {
-				output = topology.newStream(sop.getOperatorKey().toString(), sop.getLoadFunc());
+				// Wrap the spout to address STORM-368
+				IRichSpout spout_proxy;
+				if (pc.getProperties().getProperty(DISABLE_SPOUT_WRAPPER_KEY, "false").equalsIgnoreCase("true")) {
+					spout_proxy = sop.getLoadFunc();
+				} else {
+					spout_proxy = LimitedOutstandingInvocationHandler.newInstance(sop.getLoadFunc());
+				}
+				
+//				output = topology.newStream(sop.getOperatorKey().toString(), sop.getLoadFunc());
+				output = topology.newStream(sop.getOperatorKey().toString(), spout_proxy);
 				
 				System.out.println("Setting output name: " + sop.getLoadFunc().getClass().getSimpleName());
 				output = output.name(sop.getLoadFunc().getClass().getSimpleName());
@@ -194,7 +217,9 @@ public class Main {
 							output.getOutputFields(),
 							sop.getTupleConverter(),
 							output_fields)
-						.project(output_fields);				
+						.project(output_fields);
+				
+//				output.each(output.getOutputFields(), new Debug());
 				
 				sop_streams.put(sop, output);
 
@@ -224,6 +249,7 @@ public class Main {
 							new TriMapFunc.MakeKeyRawValue(),
 							group_key
 						);
+//				input.each(input.getOutputFields(), new Debug());
 				
 				// Setup the aggregator.
 				// We want one aggregator to handle the actual combine.
@@ -249,8 +275,11 @@ public class Main {
 				}
 
 				// Group and aggregate
-				TridentState gr_persist = input.groupBy(group_key)
-						.aggregate(orig_input_fields, agg, output_fields)
+				Stream aggregated = input.groupBy(group_key)
+						.aggregate(orig_input_fields, agg, output_fields);
+//				aggregated.each(aggregated.getOutputFields(), new Debug());
+				
+				TridentState gr_persist = aggregated
 						.partitionPersist(
 									sop.getStateFactory(pc),
 									TridentUtils.fieldsUnion(group_key, output_fields),
@@ -261,6 +290,7 @@ public class Main {
 					gr_persist.parallelismHint(sop.getParallelismHint());
 				}
 				output = gr_persist.newValuesStream();
+//				output.each(output.getOutputFields(), new Debug());
 			
 				// Re-alias the raw as the key.
 				output = output.each(
@@ -314,9 +344,11 @@ public class Main {
 	
 	void runTestCluster(String topology_name, long wait_time, boolean debug) {
 		// Run test.
-		Map conf = new HashMap();
+		Config conf = new Config();
 		conf.put(Config.TOPOLOGY_WORKERS, 1);
 		conf.put(Config.TOPOLOGY_DEBUG, debug);
+		
+		passPigContextProperties(conf);
 		
 		try {
 			LocalCluster cluster = new LocalCluster();
@@ -357,9 +389,18 @@ public class Main {
 	    conf.registerSerialization(CombineTupleWritable.class, WritableKryoSerializer.class);
 	}
 	
+	public void passPigContextProperties(Config conf) {
+		for (Entry<Object, Object> prop : pc.getProperties().entrySet()) {
+			String k = (String) prop.getKey();
+			if (k.startsWith(PIG_STREAMING_KEY_PREFIX)) {
+				conf.put(k, prop.getValue());
+			}
+		}
+	}
+	
 	public void launch(String jarFile) throws AlreadyAliveException, InvalidTopologyException, IOException {
-		if (pc.getProperties().getProperty("pig.streaming.run.test.cluster.direct", "false").equalsIgnoreCase("true")) {
-			String topology_name = pc.getProperties().getProperty("pig.streaming.topology.name", "PigStorm-" + pc.getLastAlias());
+		if (pc.getProperties().getProperty(RUN_DIRECT_KEY, "false").equalsIgnoreCase("true")) {
+			String topology_name = pc.getProperties().getProperty(TOPOLOGY_NAME_KEY, "PigStorm-" + pc.getLastAlias());
 			runTestCluster(topology_name);
 		} else {			
 			// Execute "storm jar <jarfile> <this.classname>";
@@ -393,8 +434,9 @@ public class Main {
 	public void submitTopology(String topology_name) throws AlreadyAliveException, InvalidTopologyException {
 		Config conf = new Config();
 		
-		String extraConf = pc.getProperties().getProperty("pig.streaming.extra.conf", null);
+		String extraConf = pc.getProperties().getProperty(EXTRA_CONF_KEY, null);
 		if (extraConf != null) {
+			System.out.println("Loading additional configuration properties from: " + extraConf);
 			// Load the configuration file.
 			Yaml yaml = new Yaml();
 			FileReader fr;
@@ -408,13 +450,15 @@ public class Main {
 			}	
 		}
 		
-		int workers = Integer.parseInt(pc.getProperties().getProperty("pig.streaming.workers", "4"));
+		int workers = Integer.parseInt(pc.getProperties().getProperty(WORKERS_COUNT_KEY, "4"));
 		conf.setNumWorkers(workers);
-		int ackers = Integer.parseInt(pc.getProperties().getProperty("pig.streaming.ackers", "1"));
+		int ackers = Integer.parseInt(pc.getProperties().getProperty(ACKERS_COUNT_KEY, "1"));
 		conf.setNumAckers(ackers);
 		
 		// Register a Serializer for any Writable.
 		registerSerializer(conf);
+		
+		passPigContextProperties(conf);
 		
 		StormSubmitter submitter = new StormSubmitter();
 		
@@ -424,8 +468,8 @@ public class Main {
 	public void runTestCluster(String topology_name) {
 		log.info("Running test cluster...");
 		
-		boolean debug = pc.getProperties().getProperty("pig.streaming.debug", "false").equalsIgnoreCase("true");
-		int wait_time = Integer.parseInt(pc.getProperties().getProperty("pig.streaming.run.test.cluster.wait_time", "10000"));
+		boolean debug = pc.getProperties().getProperty(DEBUG_ENABLE_KEY, "false").equalsIgnoreCase("true");
+		int wait_time = Integer.parseInt(pc.getProperties().getProperty(TEST_CLUSTER_WAIT_TIME_KEY, "10000"));
 		
 		runTestCluster(topology_name, wait_time, debug);
 		
@@ -452,9 +496,9 @@ public class Main {
 		pc = (PigContext) getStuff("pigContext");
 		initFromPigContext(pc);
 		
-		String topology_name = pc.getProperties().getProperty("pig.streaming.topology.name", "PigStorm-" + pc.getLastAlias());
+		String topology_name = pc.getProperties().getProperty(TOPOLOGY_NAME_KEY, "PigStorm-" + pc.getLastAlias());
 		
-		if (pc.getProperties().getProperty("pig.streaming.run.test.cluster", "false").equalsIgnoreCase("true")) {
+		if (pc.getProperties().getProperty(RUN_TEST_CLUSTER_KEY, "false").equalsIgnoreCase("true")) {
 			runTestCluster(topology_name);
 			log.info("Exitting forcefully due to non-terminated threads...");
 			System.exit(0);
