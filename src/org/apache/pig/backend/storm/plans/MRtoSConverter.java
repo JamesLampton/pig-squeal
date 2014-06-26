@@ -228,6 +228,13 @@ public class MRtoSConverter extends MROpPlanVisitor {
 			po.setParallelismHint(mr.getRequestedParallelism());
 		}
 		splan.add(po);
+		
+		// Update the UDF list to include those used in persistence.
+		// FIXME: This doesn't account for UDFs behind a MultiState.
+		if (!po.getStateFactory(pc).getClass().getName().startsWith("storm.trident.testing")) {
+			splan.UDFs.add(po.getStateFactory(pc).getClass().getName());
+		}
+		
 		try {
 			splan.connect(mo, po);
 		} catch (PlanException e) {
