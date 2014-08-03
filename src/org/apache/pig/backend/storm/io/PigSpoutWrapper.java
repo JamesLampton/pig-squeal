@@ -20,6 +20,7 @@ import org.apache.pig.LoadMetadata;
 import org.apache.pig.ResourceSchema;
 import org.apache.pig.ResourceSchema.ResourceFieldSchema;
 import org.apache.pig.ResourceStatistics;
+import org.apache.pig.backend.executionengine.ExecException;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.PigSplit;
 import org.apache.pig.backend.storm.oper.TriMakePigTuples;
 import org.apache.pig.builtin.PigStreaming;
@@ -32,6 +33,7 @@ import org.apache.pig.data.TupleFactory;
 import org.apache.pig.impl.PigContext;
 import org.apache.pig.impl.io.NullableTuple;
 import org.apache.pig.impl.logicalLayer.schema.Schema;
+import org.apache.pig.impl.util.StorageUtil;
 import org.mortbay.util.ajax.JSON;
 
 import storm.trident.operation.BaseFunction;
@@ -72,24 +74,22 @@ public class PigSpoutWrapper extends SpoutWrapper {
 		Integer POS = new Integer(1);
 		Integer NEG = new Integer(-1);
 		private TupleFactory tf;
-		private PigStreaming ps;
 		
 		@Override
 		public void prepare(java.util.Map conf, TridentOperationContext context) {
 			 tf = TupleFactory.getInstance();
-			 ps = new PigStreaming();
 		}
 			
 		@Override
 		public void execute(TridentTuple tuple, TridentCollector collector) {
-			byte[] buf = (byte[]) tuple.get(0);
-			
-			Tuple t;
+			byte[] buf;
 			try {
-				t = ps.deserialize(buf);
-			} catch (IOException e) {
+				buf = DataType.toBytes(tuple.get(0));
+			} catch (ExecException e) {
 				throw new RuntimeException(e);
 			}
+			
+			Tuple t = StorageUtil.bytesToTuple(buf, 0, buf.length, (byte) '\t');				
 			
 			collector.emit(new Values(null, new NullableTuple(t), POS));
 		}
