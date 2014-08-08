@@ -102,7 +102,7 @@ public class NOPLoad extends POLoad {
 				new FuncSpec(NOPLoader.class.getName() + "()"));
 		
 		this.setLFile(newLFile);
-		this.setAlias(load.getAlias());
+		this.addOriginalLocation(load.getAlias(), load.getOriginalLocations());
 	}
 
 	@Override

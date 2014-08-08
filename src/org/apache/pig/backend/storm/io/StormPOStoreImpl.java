@@ -8,6 +8,7 @@ import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.pig.StoreFuncInterface;
 import org.apache.pig.backend.hadoop.executionengine.mapReduceLayer.PigOutputFormat;
 import org.apache.pig.backend.hadoop.executionengine.physicalLayer.relationalOperators.POStore;
@@ -27,7 +28,10 @@ public class StormPOStoreImpl extends POStoreImpl {
 		
 		// "storm.id" "PigStorm-3-0-1-1363457130" PigStorm-3-0-1-1363536122
 		// TaskAttemptID(String jtIdentifier, int jobId, boolean isMap, int taskId, int id) 
-		TaskAttemptID attemptID = new TaskAttemptID(stormId, (int)(System.currentTimeMillis()/1000), true, partitionIndex, sign.get());
+//		TaskAttemptID attemptID = new TaskAttemptID(stormId, (int)(System.currentTimeMillis()/1000), true, partitionIndex, sign.get());
+		// TaskAttemptID(String jtIdentifier, int jobId, TaskType type, int taskId, int id) 
+//		TaskAttemptID attemptID = new TaskAttemptID(stormId, (int)(System.currentTimeMillis()/1000), TaskType.MAP, partitionIndex, sign.get());
+		TaskAttemptID attemptID = new TaskAttemptID();
 		
 		// Create a fake TaskContext for this stuff.
 		Configuration outputConf = new Configuration();
